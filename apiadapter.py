@@ -36,5 +36,5 @@ for plural,singular in config['doc_types'].items():
 
 
 if __name__ == '__main__':
-    app.run(port=9000, debug='debug' in sys.argv)
+    app.run(port=6969, debug='debug' in sys.argv)
     

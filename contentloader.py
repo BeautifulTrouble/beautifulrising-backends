@@ -17,6 +17,7 @@ from utils import log, slugify, compact
 
 
 ROOT_FOLDER = 'Beautiful Rising Toolbox Content Editing Demo'
+SERVICE_ACCOUNT_JSON = 'google-docs-etl-bff03cc95d8e.json'
 
 
 config = {}
@@ -43,7 +44,7 @@ def reset_database(couch):
 def main():
     # Get the google drive client
     drive = driveclient.DriveClient('google-docs-etl', 
-        service_account_json_filename='google-docs-etl-bff03cc95d8e.json')
+        service_account_json_filename=SERVICE_ACCOUNT_JSON)
 
     # Get the root directory containing all the content types
     root = drive.folder(ROOT_FOLDER)
