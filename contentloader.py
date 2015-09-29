@@ -17,11 +17,12 @@ from utils import log, slugify, compact
 
 
 ROOT_FOLDER = 'Beautiful Rising Toolbox Content Editing Demo'
+ASSETS_DIR = 'assets'
 
 
 config = {}
 script_dir = os.path.dirname(os.path.realpath(__file__))
-assets_dir = os.path.join(script_dir, 'assets')
+assets_dir = os.path.join(script_dir, ASSETS_DIR)
 
 
 def parse_config(data):
@@ -63,6 +64,9 @@ def main():
             break
 
     # Work from the assets directory
+    try:
+        os.mkdir(assets_dir)
+    except FileExistsError: pass
     os.chdir(assets_dir)
 
     # Download content and put it in the database
