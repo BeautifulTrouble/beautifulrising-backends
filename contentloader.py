@@ -17,12 +17,11 @@ from utils import log, slugify, compact
 
 
 ROOT_FOLDER = 'Beautiful Rising Toolbox Content Editing Demo'
-ASSETS_DIR = 'assets'
 
 
 config = {}
 script_dir = os.path.dirname(os.path.realpath(__file__))
-assets_dir = os.path.join(script_dir, ASSETS_DIR)
+assets_dir = os.path.join(script_dir, 'assets')
 
 
 def parse_config(data):
