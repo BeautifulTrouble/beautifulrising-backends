@@ -3,7 +3,7 @@
 import json
 import sys
 
-from flask import Flask, Response, request
+from flask import Flask, Response, request, jsonify
 
 import couchclient
 
@@ -29,10 +29,15 @@ for plural,singular in config['doc_types'].items():
 
     def get_one(id):
         type = request.url_rule.endpoint
-        try: result = json.dumps(couch[type, id])
+        try: result = couch[type, id]
         except: return '', 404
-        return Response(result, 200, mimetype='application/json')
+        return jsonify(result)
     app.add_url_rule('/{PREFIX}/{singular}/<id>'.format(**vars()), singular, get_one)
+
+
+@app.route('/{PREFIX}/config'.format(**vars()))
+def config_():
+    return jsonify(config)
 
 
 if __name__ == '__main__':
