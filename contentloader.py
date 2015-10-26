@@ -83,7 +83,7 @@ def main():
         for image in folder.images:
             if image.title in images:
                 log("Downloading image {}...".format(image.title))
-                #XXX: Skip for now
+                #XXX: Skip for now (but the following line does work)
                 #image.save_as(image.title)
     
 

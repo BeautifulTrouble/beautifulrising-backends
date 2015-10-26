@@ -6,10 +6,13 @@ import re
 import unidecode
 
 def slugify(s):
-    return re.sub(r'\W+', '-', unidecode.unidecode(s).lower())
+    s = unidecode.unidecode(s).lower()
+    s = s.replace("'", '')
+    return re.sub(r'\W+', '-', s)
 
 def compact(s):
-    return re.sub(r'\s+', '', unidecode.unidecode(s).lower())
+    s = unidecode.unidecode(s).lower()
+    return re.sub(r'\s+', '', s)
 
 def log(*s, fatal=None):
     s = ' '.join(s)
