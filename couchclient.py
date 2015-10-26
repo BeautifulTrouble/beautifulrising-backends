@@ -34,7 +34,7 @@ class CouchClient(object):
         '''
         if isinstance(item, tuple):
             item = ':'.join(item)
-        return self.db[slugify(item)]
+        return self.db[slugify(item, allow=':')]
 
     def __setitem__(self, item, value):
         '''
@@ -47,7 +47,7 @@ class CouchClient(object):
         '''
         if not isinstance(item, tuple):
             item = item.split(':', 1)
-        type, slug = map(slugify, item)
+        type, slug = (slugify(i, allow=':') for i in item)
         value.update({'slug': slug, 'type': type})
         self.db[':'.join((type, slug))] = value
 
@@ -62,7 +62,7 @@ class CouchClient(object):
         '''
         if isinstance(item, tuple):
             item = ':'.join(item)
-        del self.db[slugify(item)]
+        del self.db[slugify(item, allow=':')]
 
     def add_view(self, view_name, map, reduce=None, **kw):
         '''

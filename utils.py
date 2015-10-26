@@ -5,10 +5,10 @@ import re
 
 import unidecode
 
-def slugify(s):
+def slugify(s, allow=''):
     s = unidecode.unidecode(s).lower()
     s = s.replace("'", '')
-    return re.sub(r'\W+', '-', s)
+    return re.sub(r'[^\w{}]+'.format(allow), '-', s)
 
 def compact(s):
     s = unidecode.unidecode(s).lower()
