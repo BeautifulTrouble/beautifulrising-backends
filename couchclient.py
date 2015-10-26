@@ -28,12 +28,12 @@ class CouchClient(object):
         Proxy the underlying database object and auto-slugify the string(s)
         provided. Example:
 
-            bern = couch['candidate_bernie-sanders']
+            bern = couch['candidate:bernie-sanders']
             bern = couch['candidate', 'Bernie Sanders']
 
         '''
         if isinstance(item, tuple):
-            item = '_'.join(item)
+            item = ':'.join(item)
         return self.db[slugify(item)]
 
     def __setitem__(self, item, value):
@@ -41,27 +41,27 @@ class CouchClient(object):
         Proxy the underlying database object and auto-slugify the string(s)
         provided. The slug and type will be added to the document. Example:
 
-            couch['candidate_donald-trump'] = {...}
+            couch['candidate:donald-trump'] = {...}
             couch['candidate', 'Donald Trump'] = {...}
 
         '''
         if not isinstance(item, tuple):
-            item = item.split('_', 1)
+            item = item.split(':', 1)
         type, slug = map(slugify, item)
         value.update({'slug': slug, 'type': type})
-        self.db['_'.join((type, slug))] = value
+        self.db[':'.join((type, slug))] = value
 
     def __delitem__(self, item):
         '''
         Proxy the underlying database object and auto-slugify the string(s)
         provided. Example:
 
-            del couch['candidate_bernie-sanders']
+            del couch['candidate:bernie-sanders']
             del couch['candidate', 'Bernie Sanders']
 
         '''
         if isinstance(item, tuple):
-            item = '_'.join(item)
+            item = ':'.join(item)
         del self.db[slugify(item)]
 
     def add_view(self, view_name, map, reduce=None, **kw):
