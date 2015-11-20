@@ -115,7 +115,6 @@ def main():
                     if not title:
                         log('"{}" needs a title. Skipping!'.format(document.title))
                         continue
-                    log("Parsed content of {}...".format(document.title))
 
                     if 'image' in content:
                         images.append(content['image'])
@@ -123,6 +122,8 @@ def main():
                     # Store the actual data
                     # TODO: handle duplicate couchdb ids
                     couch[type, title] = content
+
+                    log("Parsed content of {}...".format(document.title))
 
     # Now that all content has been processed, download the images
     if image_folder:
