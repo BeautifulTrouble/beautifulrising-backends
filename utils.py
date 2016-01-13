@@ -24,7 +24,7 @@ def compact(s):
     return re.sub(r'\s+', '', s)
 
 
-def log(*s, fatal=None):
+def log(*s, fatal=False):
     '''
     Simple "tee-style" logging with timestamps
     '''
@@ -38,5 +38,12 @@ def log(*s, fatal=None):
         sys.exit(int(fatal))
 
 
-__all__ = ['slugify', 'compact', 'log']
+def die(*s):
+    '''
+    Perl-y
+    '''
+    log(*s, fatal=True):
+
+
+__all__ = ['slugify', 'compact', 'log', 'die']
 
