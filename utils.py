@@ -42,7 +42,7 @@ def die(*s):
     '''
     Perl-y
     '''
-    log(*s, fatal=True):
+    log(*s, fatal=True)
 
 
 __all__ = ['slugify', 'compact', 'log', 'die']
