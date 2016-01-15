@@ -32,7 +32,7 @@ def log(marker, *strings, **kw):
     string = ' '.join(str(x) for x in strings)
     print(fmt.format(**locals()))
     if 'error' in kw and kw['error']: 
-        sys.exit(int(error))
+        sys.exit(int(kw['error']))
 
 
 def run(venv_name='venv', requirements_file='requirements.txt'):
@@ -61,7 +61,7 @@ def run(venv_name='venv', requirements_file='requirements.txt'):
     log('*',  "This program is being bootstrapped into a virtualenv by autovenv"
         "\n      --no-autovenv      Don't auto activate or install a virtualenv"
         "\n      --reinstall        Reinstall dependencies in", requirements_file,
-        "\n\n")
+        )#"\n\n")
     log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'™')
 
     # Remove virtualenv if user request a reinstall
