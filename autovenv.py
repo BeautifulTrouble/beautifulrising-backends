@@ -36,7 +36,7 @@ def run(venv_name='venv', requirements_file='requirements.txt'):
     
     '''
     # Detect flags intended for autovenv and remove them from sys.argv
-    flags = '--no-autovenv --reinstall'
+    flags = '--no-autovenv --remove'
     flags = {f:not sys.argv.remove(f) if f in sys.argv else False for f in flags.split()}
 
     # Do nothing if this is the second stage run where an environment 
@@ -54,16 +54,16 @@ def run(venv_name='venv', requirements_file='requirements.txt'):
     venv_python = os.path.join(venv_dir, 'bin', 'python')
 
     # Show the disclaimer
-    log('*',  "This program is being bootstrapped into a virtualenv by autovenv"
-        "\n      --no-autovenv      Don't auto activate or install a virtualenv"
-        "\n      --reinstall        Reinstall dependencies in", requirements_file,
-        )#"\n\n")
+    log('*',  "Autovenv is bootstrapping a virtual environment using " + requirements_file,
+        "\n      --no-autovenv      Don't auto activate or install a virtualenv",
+        "\n      --remove           Remove old virtualenv so a fresh one can be installed",
+        "\n")
     log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'™')
 
-    # Remove virtualenv if user request a reinstall
-    if flags['--reinstall']:
+    # Remove the bad virtualenv
+    if flags['--remove']:
         shutil.rmtree(venv_dir, ignore_errors=True)
-        log('i', 'Removed existing virtualenv to force reinstall')
+        log('i', 'Removed existing virtualenv', error=1)
 
     # Handle the case of the nonexistant virtualenv by creating it
     if not os.path.isfile(venv_python):
