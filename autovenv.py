@@ -19,10 +19,6 @@ import sys
 import venv
 
 
-
-class AutovenvIsBusted(Exception): ...
-
-
 def log(marker, *strings, **kw):
     '''
     [+], [-] and [warning] output with glorious ANSI color escapes (where available)
