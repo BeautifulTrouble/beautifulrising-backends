@@ -92,7 +92,7 @@ class Config(Resource):
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
 
 
-@app.route(GOOGLE_VERIFICATION)
+@app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
 
