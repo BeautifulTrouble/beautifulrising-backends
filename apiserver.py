@@ -1,10 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Notes to self:
 * many endpoints return a subset
 * querystring as opposed to prefix?
 
 """
+import autovenv
+autovenv.run()
 
 import sys
 

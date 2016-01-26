@@ -73,12 +73,13 @@ class ContentLoader(object):
 
         # Get all or some documents according to command line flags
         documents = self.get_documents()
-        print(documents)
 
         # Import docs or don't, depending on your --options
         for document in documents:
             if self.options.watch_docs:
                 pass
+                #XXX:
+                
             else:
                 published = re.search(self.config['published-keyword'], document.title)
                 if published or self.options.report_broken_docs:
