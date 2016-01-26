@@ -48,7 +48,7 @@ def strip_smartquotes(s):
     return reduce(replace, pairs, s)
 
 
-def log(*s, fatal=False):
+def log(*s, fatal=False, **kw):
     '''
     Simple "tee-style" logging with timestamps
     '''
@@ -56,7 +56,7 @@ def log(*s, fatal=False):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(script_dir, 'log.txt'), 'a') as file:
         file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
-        print(s)
+        print(s, **kw)
     if fatal:
         print('Quitting.')
         sys.exit(int(fatal))
