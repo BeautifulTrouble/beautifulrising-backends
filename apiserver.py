@@ -19,6 +19,7 @@ from werkzeug.exceptions import NotFound
 from utils import *
 
 
+PORT = 6000
 PREFIX = 'api/v1'
 GOOGLE_VERIFICATION = 'google5844dd3c739be066.html'
 
@@ -45,6 +46,18 @@ def flatten_args(args, sep=','):
 #query_by_type = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}"
 
 
+# Keep the googles happy
+@app.route('/' + GOOGLE_VERIFICATION)
+def google_verification():
+    return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
+
+
+# Change notifications
+@app.route('/notify', methods=['POST'])
+def notify():
+    header = lambda name: request.headers.get(name, '')
+    print(request.headers)
+    return 'OK', 200
 
 
 # Get content types and create endpoints
@@ -92,11 +105,6 @@ class Config(Resource):
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
 
 
-@app.route('/' + GOOGLE_VERIFICATION)
-def google_verification():
-    return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
-
-
 if __name__ == '__main__':
-    app.run(port=6969, debug='debug' in sys.argv)
+    app.run(port=PORT, debug='debug' in sys.argv)
 

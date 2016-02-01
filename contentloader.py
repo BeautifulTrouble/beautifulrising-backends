@@ -9,6 +9,7 @@ import datetime
 import os
 import re
 import sys
+import time
 from io import BytesIO, StringIO
 from itertools import zip_longest
 
@@ -24,40 +25,49 @@ from utils import *
 DB_NAME = 'toolbox'
 CONFIG_FILE_NAME = 'CONFIG'
 ROOT_FOLDER_NAME = 'BR CONTENT'
-SERVICE_ACCOUNT_JSON_FILENAME = 'google-docs-etl-bff03cc95d8e.json'
-
+DRIVE_CLIENT_NAME = 'beautiful-rising'
+SERVICE_ACCOUNT_JSON_FILENAME = 'beautiful-rising-eae5ff71ae04.json'
 
 
 class ContentLoader(object):
     def __init__(self):
         # Parse command line arguments
         argparser = argparse.ArgumentParser(description="")
-        argparser.add_argument('--get', type=str, metavar='DOCUMENT_ID', action='append',
-            help="Fetch a single document by its globally unique id, then update associated "
-            "metadata and assets. Specify multiple times to get multiple documents at once. "
+        argparser.add_argument('--id', type=str, metavar='DOCUMENT_ID', action='append', 
+            default=[], dest='ids', help="Fetch a single document by its globally unique id, "
+            "then update associated metadata and assets. Specify multiple times to get multiple "
+            "documents at once."
+        )
+        argparser.add_argument('--change-id', type=str, metavar='CHANGE_ID', action='append', 
+            default=[], dest='changes', help="Fetch a single document by its ephemeral change id, "
+            "then update associated metadata and assets. Specify multiple times to get multiple "
+            "documents at once."
+        )
+        argparser.add_argument('--reconfigure-only', action='store_true', help="Reload the "
+            "configuration data and exit."
+        )
+        argparser.add_argument('--delete-db', action='store_true',
+            help='Delete any existing database named "{}".'.format(DB_NAME)
         )
         argparser.add_argument('--watch-docs', action='store_true',
-            help="Register callbacks for all files found. Don't fetch any content."
+            help="Initiate a request to watch drive for changes. This will expire in one day. "
+            "This does not fetch any documents."
+        )
+        argparser.add_argument('--stop-watching', type=str, metavar='CHANNEL_ID:RESOURCE_ID',
+            help="Stop watching docs on the specified combination of channel and resource ids."
         )
         argparser.add_argument('--report-broken-docs', action='store_true', 
             help="Produce a document containing information about documents which lack required "
             "fields for their type, as specified in the config document."
         )
-        argparser.add_argument('--reset-db', action='store_true',
-            help='Reset any existing database called "{}" before loading content.'.format(DB_NAME)
-        )
         self.options,_ = argparser.parse_known_args()
 
         # Connect to couchdb
         self.couch = couchdb.Server()
-        if self.options.reset_db and DB_NAME in self.couch:
-            confirm = input('Are you sure you want to delete the database "{}" [y/N]? '.format(DB_NAME))
-            if confirm.lower() == 'y':
-                del self.couch[DB_NAME]
         self.db = self.couch[DB_NAME] if DB_NAME in self.couch else self.couch.create(DB_NAME)
 
         # Connect to Google Drive API
-        self.drive = driveclient.DriveClient('google-docs-etl', 
+        self.drive = driveclient.DriveClient(DRIVE_CLIENT_NAME,
             scopes='https://www.googleapis.com/auth/drive',
             service_account_json_filename=SERVICE_ACCOUNT_JSON_FILENAME)
         self.root = self.drive.folder(ROOT_FOLDER_NAME) 
@@ -68,19 +78,42 @@ class ContentLoader(object):
         self.all_content = []
         self.published_content = []
 
+
+        # -------------------------------------------
+        # Decide behavior based on command line args
+        # -------------------------------------------
+
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
+        if self.options.reconfigure_only: ...
 
-        # Get all or some documents according to command line flags
-        documents = self.get_documents()
+        # Delete database
+        elif self.options.delete_db:
+            confirm = input('Are you sure you want to delete the database "{}" [y/N]? '.format(DB_NAME))
+            if confirm.lower() == 'y':
+                del self.couch[DB_NAME]
 
-        # Import docs or don't, depending on your --options
-        for document in documents:
-            if self.options.watch_docs:
-                pass
-                #XXX:
-                
-            else:
+        # Manage watching of changes
+        elif self.options.watch_docs:
+            self.drive.service.changes().watch(body={
+                'id': 'testing',
+                'type': 'web_hook',
+                'address': self.config['callback-url'],
+                'token': self.config['callback-token'],
+                # Expiration time should be in UTC, about 24 hours from now
+            }).execute()
+        elif self.options.stop_watching:
+            channel, resource = self.options.stop_watching.split(':', 1)
+            self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}).execute()
+            log("Requested that notifications no longer be sent to {}".format(self.config['callback-url']))
+
+        # Or load some content
+        else:
+            #TODO: handle document renaming/deletion
+            documents = self.get_documents()
+            print(documents)
+
+            for document in documents:
                 published = re.search(self.config['published-keyword'], document.title)
                 if published or self.options.report_broken_docs:
                     content = self.extract_and_transform(document)
@@ -88,12 +121,13 @@ class ContentLoader(object):
                     if published:
                         self.published_content.append(content)
 
-        self.filter_broken_documents()
-        #self.download_assets()
-        for content_item in self.published_content:
-            self.save(content_item)
+            self.filter_broken_documents()
+            #self.download_assets()
+            for content_item in self.published_content:
+                self.save(content_item)
 
-    def id(self, content):
+
+    def content_id(self, content):
         '''
         Produce consistent ids for couchdb
         '''
@@ -104,7 +138,7 @@ class ContentLoader(object):
         '''
         Write doc to couchdb, adding a revision if the document exists
         '''
-        doc.update(_id=id or self.id(doc))
+        doc.update(_id=id or self.content_id(doc))
         try:
             doc.update(_rev=self.db[doc['_id']]['_rev'])
         except couchdb.http.ResourceNotFound: pass
@@ -122,6 +156,8 @@ class ContentLoader(object):
         self.config = c = {}
         data = archieml.loads(document.text)
 
+        c['callback-url'] = data.get('callback-url', '')
+        c['callback-token'] = data.get('callback-token', '')
         c['plural-separator'] = data.get('plural-separator', r'(?:\s*,|\s+&)\s+')
         c['plural-keys'] = data.get('plural-keys', {})
         c['collate'] = data.get('collate', {})
@@ -137,16 +173,20 @@ class ContentLoader(object):
                 c[k] = v
 
         self.save(c, 'config:api')
+        log('Loaded configuration options from file "{}"'.format(CONFIG_FILE_NAME))
 
 
     def get_documents(self):
         '''
-        Get content for all (or some) documents and populate all_content or published_content
+        Get content by file ids, change ids or all documents
         '''
-        if self.options.get:
-            documents = filter(None, (self.drive.get(id) for id in self.options.get))
+        documents = []
+        # Get only the requested documents
+        if self.options.changes or self.options.ids:
+            documents.extend(d for d in (self.drive.change(id) for id in self.options.changes) if d)
+            documents.extend(d for d in (self.drive.get(id) for id in self.options.ids) if d)
+        # Get all documents from the content folders
         else:
-            documents = []
             for folder in self.root.folders:
                 # Try to match one of the content types with this folder's name
                 if any(re.search(pat, folder.title) for pat in self.config['content']):
