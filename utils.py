@@ -8,6 +8,20 @@ from functools import reduce
 
 import unidecode
 
+    
+@contextlib.contextmanager
+def script_directory():
+    '''
+    A context manager which allows you to write blocks of code which run within 
+    the current script's directory. The working directory is restored afterward.
+    '''
+    cwd = os.getcwd()
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    try:
+        yield
+    finally:
+        os.chdir(cwd)
+
 
 @contextlib.contextmanager
 def script_subdirectory(name):
@@ -70,6 +84,7 @@ def die(*s):
 
 
 __all__ = [
+    'script_directory', 
     'script_subdirectory', 
     'slugify', 
     'strip_smartquotes',
