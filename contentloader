@@ -43,9 +43,6 @@ class ContentLoader(object):
             "then update associated metadata and assets. Specify multiple times to get multiple "
             "documents at once."
         )
-        argparser.add_argument('--reconfigure-only', action='store_true', help="Reload the "
-            "configuration data and exit."
-        )
         argparser.add_argument('--delete-db', action='store_true',
             help='Delete any existing database named "{}".'.format(DB_NAME)
         )
@@ -53,8 +50,8 @@ class ContentLoader(object):
             help="Initiate a request to watch drive for changes. This will expire in one day. "
             "This does not fetch any documents."
         )
-        argparser.add_argument('--stop-watching', type=str, metavar='CHANNEL_ID:RESOURCE_ID',
-            help="Stop watching docs on the specified combination of channel and resource ids."
+        argparser.add_argument('--stop-watching', action='store_true', 
+            help="Stop watching docs based on notification channels stored in the db."
         )
         argparser.add_argument('--report-broken-docs', action='store_true', 
             help="Produce a document containing information about documents which lack required "
@@ -78,34 +75,39 @@ class ContentLoader(object):
         self.all_content = []
         self.published_content = []
 
-
         # -------------------------------------------
         # Decide behavior based on command line args
         # -------------------------------------------
 
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
-        if self.options.reconfigure_only: ...
 
-        # Delete database
-        elif self.options.delete_db:
+        # Delete database (which is always auto-created if needed, and could already be empty)
+        if self.options.delete_db:
             confirm = input('Are you sure you want to delete the database "{}" [y/N]? '.format(DB_NAME))
             if confirm.lower() == 'y':
                 del self.couch[DB_NAME]
 
-        # Manage watching of changes
+        # Handle change watching (the other components of this are in the apiserver)
         elif self.options.watch_docs:
+            now = datetime.datetime.utcnow()
             self.drive.service.changes().watch(body={
-                'id': 'testing',
+                'id': '{}-{:%s}'.format(DRIVE_CLIENT_NAME, now),
                 'type': 'web_hook',
-                'address': self.config['callback-url'],
-                'token': self.config['callback-token'],
-                # Expiration time should be in UTC, about 24 hours from now
+                'address': self.config['notification-url'],
+                'token': self.config['notification-token'],
+                'expiration': int((360*24 + now.timestamp()) * 1000) # UTC + 24h in ms
             }).execute()
+            log("watch: for push notifications at {}".format(self.config['notification-url']))
         elif self.options.stop_watching:
-            channel, resource = self.options.stop_watching.split(':', 1)
-            self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}).execute()
-            log("Requested that notifications no longer be sent to {}".format(self.config['callback-url']))
+            if 'config:notification-channels' in self.db:
+                for channel,resource in self.db['config:notification-channels'].items():
+                    if channel not in ('_id', '_rev'):
+                        try:
+                            self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}).execute()
+                            log("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
+                        except: pass
+                del self.db['config:notification-channels']
 
         # Or load some content
         else:
@@ -122,7 +124,7 @@ class ContentLoader(object):
                         self.published_content.append(content)
 
             self.filter_broken_documents()
-            #self.download_assets()
+            self.download_assets()
             for content_item in self.published_content:
                 self.save(content_item)
 
@@ -137,6 +139,7 @@ class ContentLoader(object):
     def save(self, doc, id=None):
         '''
         Write doc to couchdb, adding a revision if the document exists
+        To clarify, this is a couchdb doc and not a google doc.
         '''
         doc.update(_id=id or self.content_id(doc))
         try:
@@ -156,8 +159,8 @@ class ContentLoader(object):
         self.config = c = {}
         data = archieml.loads(document.text)
 
-        c['callback-url'] = data.get('callback-url', '')
-        c['callback-token'] = data.get('callback-token', '')
+        c['notification-url'] = data.get('notification-url', '')
+        c['notification-token'] = data.get('notification-token', '')
         c['plural-separator'] = data.get('plural-separator', r'(?:\s*,|\s+&)\s+')
         c['plural-keys'] = data.get('plural-keys', {})
         c['collate'] = data.get('collate', {})
@@ -278,11 +281,12 @@ class ContentLoader(object):
                         if asset_name == asset.title or asset_name == asset.title.rsplit('.')[0]:
                             # Update the filename
                             content_item[asset_spec['key']] = asset.title
-                            asset.save_as(asset.title)
+                            # TODO: Make this smart enough to prevent re-downloading
+                            #asset.save_as(asset.title)
                             log('Downloaded asset "{}"'.format(asset.title))
 
 
-    def write_document(self, name, parent, bytestring, source_mimetype='text/plain'):
+    def write_document(self, name, folder, bytestring, source_mimetype='text/plain'):
         '''
         Given a filename and a parent folder, create or update a document with a bytestring
         Docs will be converted from their source_mimetype
@@ -295,11 +299,11 @@ class ContentLoader(object):
             'convert': True,
             'media_body': MediaIoBaseUpload(BytesIO(bytestring), mimetype=source_mimetype),
         }
-        existing_file = parent.file(name)
+        existing_file = folder.file(name)
         if existing_file:
             self.drive.service.files().update(fileId=existing_file.id, **params).execute()
         else:
-            params['body']['parents'] = [{'id': parent.id}]
+            params['body']['parents'] = [{'id': folder.id}]
             self.drive.service.files().insert(**params).execute()
 
 
