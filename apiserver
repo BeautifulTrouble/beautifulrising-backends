@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-Notes to self:
-* many endpoints return a subset
-* querystring as opposed to prefix?
 
-"""
 import autovenv
 autovenv.run()
 
+import os
 import sys
+from subprocess import Popen
+from urllib.parse import urlparse
 
 import couchdb
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, jsonify
 from flask_restful import Resource, Api
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
 
@@ -26,38 +24,77 @@ GOOGLE_VERIFICATION = 'google5844dd3c739be066.html'
 
 app = Flask(__name__)
 api = Api(app)
-
 couch = couchdb.Server()
 db = couch['toolbox']
-
 config = db['config:api']
 
 
 def flatten_args(args, sep=','):
-    # Flatten a werkzeug MultiDict containing duplicate, optionally comma-
-    # separated query parameters to a dictionary of lists without duplicates
-    #   e.g.:     "?name=foo&tags=a,b&tags=c,d&tags=d"
-    #   becomes:  {'name': ['foo'], 'tags': ['a', 'c', 'b', 'd']}
+    '''
+    Flatten a werkzeug MultiDict containing duplicate, optionally comma-
+    separated query parameters to a dictionary of lists without duplicates
+        e.g.:     "?name=foo&tags=a,b&tags=c,d&tags=d"
+        becomes:  {'name': ['foo'], 'tags': ['a', 'c', 'b', 'd']}
+    '''
     return {k: list({i for splitL in (L.split(sep) for L in args.getlist(k)) for i in splitL})
             for k in args}
 
 
-# In lieu of a proper couchdb design document, here's a temporary query
-#query_by_type = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}"
+def header(name):
+    '''
+    Always get a string, even for missing headers
+    '''
+    return request.headers.get(name, '')
 
 
-# Keep the googles happy
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
+    '''
+    Keep the googles happy
+    '''
     return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
 
 
-# Change notifications
-@app.route('/notify', methods=['POST'])
+@app.route(urlparse(config['notification-url']).path, methods=['POST'])
 def notify():
-    header = lambda name: request.headers.get(name, '')
-    print(request.headers)
-    return 'OK', 200
+    '''
+    Handle change notifications
+    '''
+    # Before doing anything, verify the notification token
+    if header('X-Goog-Channel-Token') != config['notification-token']:
+        raise Forbidden
+
+    state = header('X-Goog-Resource-State')
+    channel_id = header('X-Goog-Channel-Id')
+    resource_id = header('X-Goog-Resource-Id')
+
+    # Save new notification ids so they can be cancelled
+    if state == 'sync':
+        log("sync: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
+        try:
+            channels = db['config:notification-channels']
+            channels[channel_id] = resource_id
+        except ResourceNotFound:
+            channels = {channel_id: resource_id}
+            channels.update({'_id': 'config:notification-channels'})
+        db.save(channels)
+
+    # Attempt to invoke the content loader
+    elif state == 'change':
+        log("change: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
+        body = request.get_json()
+        if body:
+            with script_directory():
+                change_number = str(int(body['id']))
+                # Using sys.executable ensures the virtualenv currently in effect 
+                # for this server will also be used for the contentloader tool.
+                pid = Popen([sys.executable, "contentloader", "--change", change_number]).pid
+
+    return 'OK'
+
+
+# In lieu of a proper couchdb design document, here's a temporary query
+#query_by_type = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}"
 
 
 # Get content types and create endpoints
