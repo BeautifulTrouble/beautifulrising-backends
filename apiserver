@@ -138,7 +138,7 @@ for singular_name,plural_name in types.items():
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
-        return config
+        return {k:v for k,v in config.items() if k != 'notification-token'}
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
 
 
