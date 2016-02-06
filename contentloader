@@ -66,8 +66,7 @@ class ContentLoader(object):
         # Connect to Google Drive API
         self.drive = driveclient.DriveClient(DRIVE_CLIENT_NAME,
             scopes='https://www.googleapis.com/auth/drive',
-            service_account_json_filename=SERVICE_ACCOUNT_JSON_FILENAME,
-            limit_service_calls_per_second=9)
+            service_account_json_filename=SERVICE_ACCOUNT_JSON_FILENAME)
         self.root = self.drive.folder(ROOT_FOLDER_NAME) 
         if not self.root:
             die("Can't find the root folder!")
