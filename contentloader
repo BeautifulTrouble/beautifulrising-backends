@@ -169,13 +169,13 @@ class ContentLoader(object):
         Request push notifications for entire drive be sent to the notification-url
         '''
         now = datetime.datetime.utcnow()
-        self.drive.service.changes().watch(body={
+        self.drive.execute(self.drive.service.changes().watch(body={
             'id': '{}-{:%s}'.format(DRIVE_CLIENT_NAME, now),
             'type': 'web_hook',
             'address': self.config['notification-url'],
             'token': self.config['notification-token'],
             'expiration': int((360*24 + now.timestamp()) * 1000) # UTC + 24h in ms
-        }).execute()
+        }))
         log("watch: for push notifications at {}".format(self.config['notification-url']))
     
     
@@ -187,7 +187,7 @@ class ContentLoader(object):
             for channel,resource in self.db['config:notification-channels'].items():
                 if channel not in ('_id', '_rev'):
                     try:
-                        self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}).execute()
+                        self.drive.execute(self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}))
                         log("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
                     except: pass
             del self.db['config:notification-channels']
@@ -314,10 +314,10 @@ class ContentLoader(object):
         }
         existing_file = folder.file(name)
         if existing_file:
-            self.drive.service.files().update(fileId=existing_file.id, **params).execute()
+            self.drive.execute(self.drive.service.files().update(fileId=existing_file.id, **params))
         else:
             params['body']['parents'] = [{'id': folder.id}]
-            self.drive.service.files().insert(**params).execute()
+            self.drive.execute(self.drive.service.files().insert(**params))
 
 
     def report_broken_documents(self, missing):
