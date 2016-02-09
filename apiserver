@@ -88,7 +88,7 @@ def notify():
                 change_number = str(int(body['id']))
                 # Using sys.executable ensures the virtualenv currently in effect 
                 # for this server will also be used for the contentloader tool.
-                pid = Popen([sys.executable, "contentloader", "--change", change_number]).pid
+                pid = Popen([sys.executable, "contentloader", "--change-id", change_number]).pid
 
     return 'OK'
 

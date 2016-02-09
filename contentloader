@@ -9,8 +9,7 @@ import datetime
 import os
 import re
 import sys
-import time
-from io import BytesIO, StringIO
+from io import BytesIO
 from itertools import zip_longest
 
 import archieml
@@ -90,6 +89,7 @@ class ContentLoader(object):
                 del self.couch[DB_NAME]
         # Handle change watching (the other components of this are in the apiserver)
         elif self.options.watch_docs:
+            self.unwatch()
             self.watch()
         elif self.options.stop_watching:
             self.unwatch()
@@ -97,7 +97,6 @@ class ContentLoader(object):
         else:
             #TODO: handle document renaming/deletion
             documents = self.get_documents()
-            print(documents)
 
             for document in documents:
                 published = re.search(self.config['published-keyword'], document.title)
@@ -143,14 +142,21 @@ class ContentLoader(object):
         self.config = c = {}
         data = archieml.loads(document.text)
 
+        # Drive notifications
         c['notification-url'] = data.get('notification-url', '')
         c['notification-token'] = data.get('notification-token', '')
+        # Where and how to find published content 
+        c['content'] = data.get('content', ['^content$'])
+        c['published-keyword'] = data.get('published-keyword', r'(?i)\bdone$')
+        # Renaming synonyms
+        c['synonyms'] = data.get('synonyms', {})
+        # Shuffling content together
         c['plural-separator'] = data.get('plural-separator', r'(?:\s*,|\s+&)\s+')
         c['plural-keys'] = data.get('plural-keys', {})
         c['collate'] = data.get('collate', {})
-        c['published-keyword'] = data.get('published-keyword', r'(?i)\bdone$')
+        # Associate assets files with a key and download them
         c['assets'] = data.get('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
-        c['content'] = data.get('content', ['^content$'])
+        # Content type information
         c['types'] = []
         for k,v in data.items():
             if k.endswith('-types'):
@@ -168,12 +174,13 @@ class ContentLoader(object):
         Request push notifications for entire drive be sent to the notification-url
         '''
         now = datetime.datetime.utcnow()
+        expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
         self.drive.execute(self.drive.service.changes().watch(body={
-            'id': '{}-{:%s}'.format(DRIVE_CLIENT_NAME, now),
+            'id': '{}-{}'.format(DRIVE_CLIENT_NAME, expiration),
             'type': 'web_hook',
             'address': self.config['notification-url'],
             'token': self.config['notification-token'],
-            'expiration': int((360*24 + now.timestamp()) * 1000) # UTC + 24h in ms
+            'expiration': expiration,
         }))
         log("watch: for push notifications at {}".format(self.config['notification-url']))
     
@@ -231,6 +238,13 @@ class ContentLoader(object):
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
+
+        # Rename synonymous keys
+        for old_key,new_key in self.config['synonyms'].items():
+            old_value = content.get(old_key)
+            if old_value is not None:
+                content[new_key] = old_value
+                del content[old_key]
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():
