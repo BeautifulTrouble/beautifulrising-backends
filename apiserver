@@ -47,6 +47,15 @@ def header(name):
     return request.headers.get(name, '')
 
 
+@app.after_request
+def add_cors_headers(response):
+    '''
+    Tell browsers it's okay to load from this resource
+    '''
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     '''
@@ -90,7 +99,8 @@ def notify():
                 # for this server will also be used for the contentloader tool.
                 pid = Popen([sys.executable, "contentloader", "--change-id", change_number]).pid
 
-    return 'OK'
+    # 204 No Content (success)
+    return ('', 204)
 
 
 # In lieu of a proper couchdb design document, here's a temporary query
