@@ -230,6 +230,13 @@ class ContentLoader(object):
 
         #TODO: Strip as much whitespace from values as possible
 
+        # Rename synonymous keys
+        for old_key,new_key in self.config['synonyms'].items():
+            old_value = content.get(old_key)
+            if old_value is not None:
+                content[new_key] = old_value
+                del content[old_key]
+
         # Add a few useful bits
         type = next((T['name'] for T in self.config['types'] if T['name'] in content), '')
         content['type'] = type
@@ -238,13 +245,6 @@ class ContentLoader(object):
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
-
-        # Rename synonymous keys
-        for old_key,new_key in self.config['synonyms'].items():
-            old_value = content.get(old_key)
-            if old_value is not None:
-                content[new_key] = old_value
-                del content[old_key]
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():

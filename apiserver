@@ -24,8 +24,10 @@ GOOGLE_VERIFICATION = 'google5844dd3c739be066.html'
 
 app = Flask(__name__)
 api = Api(app)
+
 couch = couchdb.Server()
 db = couch['toolbox']
+
 config = db['config:api']
 
 
