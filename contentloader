@@ -6,9 +6,7 @@ autovenv.run()
 
 import argparse
 import datetime
-import os
 import re
-import sys
 from io import BytesIO
 from itertools import zip_longest
 
@@ -108,8 +106,8 @@ class ContentLoader(object):
 
             self.filter_broken_documents()
             self.download_assets()
-            for content_item in self.published_content:
-                self.save(content_item)
+            for content in self.published_content:
+                self.db_save(content)
 
 
     def content_id(self, content):
@@ -119,7 +117,14 @@ class ContentLoader(object):
         return '{type}:{slug}'.format(**content)
 
 
-    def save(self, doc, id=None):
+    def type_info(self, content):
+        '''
+        Return the type data structure for the content item
+        '''
+        return next((T for T in self.config['types'] if T['name'] in content), {})
+
+
+    def db_save(self, doc, id=None):
         '''
         Write doc to couchdb, adding a revision if the document exists
         To clarify, this is a couchdb doc and not a google doc.
@@ -145,17 +150,22 @@ class ContentLoader(object):
         # Drive notifications
         c['notification-url'] = data.get('notification-url', '')
         c['notification-token'] = data.get('notification-token', '')
+
         # Where and how to find published content 
         c['content'] = data.get('content', ['^content$'])
         c['published-keyword'] = data.get('published-keyword', r'(?i)\bdone$')
+
         # Renaming synonyms
         c['synonyms'] = data.get('synonyms', {})
+
         # Shuffling content together
         c['plural-separator'] = data.get('plural-separator', r'(?:\s*,|\s+&)\s+')
         c['plural-keys'] = data.get('plural-keys', {})
         c['collate'] = data.get('collate', {})
+
         # Associate assets files with a key and download them
         c['assets'] = data.get('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
+
         # Content type information
         c['types'] = []
         for k,v in data.items():
@@ -165,7 +175,7 @@ class ContentLoader(object):
                 c['types'] += v
                 c[k] = v
 
-        self.save(c, 'config:api')
+        self.db_save(c, 'config:api')
         log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
 
 
@@ -238,7 +248,7 @@ class ContentLoader(object):
                 del content[old_key]
 
         # Add a few useful bits
-        type = next((T['name'] for T in self.config['types'] if T['name'] in content), '')
+        type = self.type_info(content).get('name')
         content['type'] = type
         content['title'] = content.get(type, '')
         content['slug'] = slugify(content['title'], allow=':')
@@ -275,17 +285,16 @@ class ContentLoader(object):
         Remove docs from published_content if they have obvious content problems 
         '''
         missing = []
-        for content_item in self.all_content:
+        for content in self.all_content:
             missing_items = []
-            required = next((T.get('required', '') for T in self.config['types'] if T['name'] == content_item['type']), '')
-            required = re.split(self.config['plural-separator'], required)
+            required = re.split(self.config['plural-separator'], self.type_info(content).get('required', ''))
             for requirement in filter(None, required):
-                if not any(content_item.get(field.strip()) for field in requirement.split('|')):
+                if not any(content.get(field.strip()) for field in requirement.split('|')):
                     missing_items.append(requirement.replace('|', ' or '))
             if missing_items:
-                missing.append((content_item, missing_items))
-                if content_item in self.published_content:
-                    self.published_content.remove(content_item)
+                missing.append((content, missing_items))
+                if content in self.published_content:
+                    self.published_content.remove(content)
         if self.options.report_broken_docs:
             self.report_broken_documents(missing)
 
@@ -302,11 +311,11 @@ class ContentLoader(object):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
                     # Find content items which require the asset
-                    for content_item in self.published_content:
-                        asset_name = content_item.get(asset_spec['key'])
+                    for content in self.published_content:
+                        asset_name = content.get(asset_spec['key'])
                         if asset_name == asset.title or asset_name == asset.title.rsplit('.')[0]:
                             # Update the filename
-                            content_item[asset_spec['key']] = asset.title
+                            content[asset_spec['key']] = asset.title
                             # TODO: Make this smart enough to prevent re-downloading
                             #asset.save_as(asset.title)
                             log('download: asset "{}"'.format(asset.title))
@@ -343,11 +352,11 @@ class ContentLoader(object):
                 Modifications to this file will be discarded.<br><em>Updated: {{ timestamp }} UTC</em>
             </p>
             <hr>
-            {% for content_item,missing_items in missing %}
+            {% for content,missing_items in missing %}
             <p>
-                <a href="{{ content_item.document_link }}">{{ content_item.document_title }}</a><br>
-                {% if content_item.authors %}
-                {% for author in content_item.authors %}
+                <a href="{{ content.document_link }}">{{ content.document_title }}</a><br>
+                {% if content.authors %}
+                {% for author in content.authors %}
                 <strong>Author:</strong> {{ author.name }} {{ author.email }}<br>
                 {% endfor %}
                 {% endif %}
