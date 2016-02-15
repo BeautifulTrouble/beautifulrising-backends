@@ -13,8 +13,9 @@ from itertools import zip_longest
 import archieml
 import couchdb
 import driveclient
+import jinja2
+import langdetect
 from apiclient.http import MediaIoBaseUpload
-from jinja2 import Template
 
 from utils import *
 
@@ -151,6 +152,9 @@ class ContentLoader(object):
         c['notification-url'] = data.get('notification-url', '')
         c['notification-token'] = data.get('notification-token', '')
 
+        # Language settings
+        c['language-fallback'] = data.get('language-fallback', 'en')
+
         # Where and how to find published content 
         c['content'] = data.get('content', ['^content$'])
         c['published-keyword'] = data.get('published-keyword', r'(?i)\bdone$')
@@ -240,15 +244,23 @@ class ContentLoader(object):
 
         #TODO: Strip as much whitespace from values as possible
 
-        # Rename synonymous keys
+        # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
             old_value = content.get(old_key)
             if old_value is not None:
                 content[new_key] = old_value
                 del content[old_key]
 
+        # Figure out the content language
+        if 'lang' not in content:
+            content['lang'] = self.config['language-fallback']
+            corpus = '\n'.join(sorted((s for s in content.values() if isinstance(s, str)), key=len, reverse=True))
+            try:
+                lang = langdetect.detect(corpus)
+            except: pass
+
         # Add a few useful bits
-        type = self.type_info(content).get('name')
+        type = self.type_info(content).get('name', '')
         content['type'] = type
         content['title'] = content.get(type, '')
         content['slug'] = slugify(content['title'], allow=':')
@@ -345,7 +357,7 @@ class ContentLoader(object):
     def report_broken_documents(self, missing):
         report_name = 'Content Error Report'
         timestamp = datetime.datetime.utcnow()
-        output = Template('''
+        output = jinja2.Template('''
             <style>* { font-family: "Consolas"; }</style>
             <h1>{{ report_name }}</h1>
             <p>
