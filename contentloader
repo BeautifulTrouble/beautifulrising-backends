@@ -256,7 +256,7 @@ class ContentLoader(object):
             content['lang'] = self.config['language-fallback']
             corpus = '\n'.join(sorted((s for s in content.values() if isinstance(s, str)), key=len, reverse=True))
             try:
-                lang = langdetect.detect(corpus)
+                content['lang'] = langdetect.detect(corpus)
             except: pass
 
         # Add a few useful bits
