@@ -153,7 +153,7 @@ class ContentLoader(object):
         c['notification-token'] = data.get('notification-token', '')
 
         # Language settings
-        c['language-fallback'] = data.get('language-fallback', 'en')
+        c['language-default'] = data.get('language-default', 'en')
 
         # Where and how to find published content 
         c['content'] = data.get('content', ['^content$'])
@@ -253,7 +253,7 @@ class ContentLoader(object):
 
         # Figure out the content language
         if 'lang' not in content:
-            content['lang'] = self.config['language-fallback']
+            content['lang'] = self.config['language-default']
             corpus = '\n'.join(sorted((s for s in content.values() if isinstance(s, str)), key=len, reverse=True))
             try:
                 content['lang'] = langdetect.detect(corpus)
