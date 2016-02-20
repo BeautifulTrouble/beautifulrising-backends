@@ -1,3 +1,4 @@
+-e git+https://github.com/adrian-the-git/google-api-python-client@master#egg=google-api-python-client-master
 -e git+https://github.com/adrian-the-git/driveclient@master#egg=driveclient-master
 -e git+https://github.com/brainkim/archieml-python.git@v0.3.0#egg=archieml-master
 flask
@@ -5,3 +6,5 @@ flask-restful
 couchdb
 unidecode
 langdetect
+fuzzywuzzy
+python-Levenshtein
