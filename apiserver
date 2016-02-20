@@ -69,7 +69,7 @@ def google_verification():
 @app.route(urlparse(config['notification-url']).path, methods=['POST'])
 def notify():
     '''
-    Handle change notifications
+    Invoke content loader upon change notification
     '''
     # Before doing anything, verify the notification token
     if header('X-Goog-Channel-Token') != config['notification-token']:
@@ -89,6 +89,11 @@ def notify():
             channels = {channel_id: resource_id}
             channels.update({'_id': 'config:notification-channels'})
         db.save(channels)
+
+    # Notify that a document is no longer in the collection
+    # TODO: new document tracking system by id
+    elif state == 'delete':
+        print('delete', request.get_json())
 
     # Attempt to invoke the content loader
     elif state == 'change':
@@ -116,23 +121,12 @@ for singular_name,plural_name in types.items():
     class Many(Resource):
         type = singular_name
         query = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}" % singular_name
+
         def get(self):
+            args = flatten_args(request.args)
             try:
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
-            args = flatten_args(request.args)
-            filtered = []
-            if 'tags' in args:
-                for doc in resources:
-                    pass
-                    # filtering should be generic, no?
-                    # here's where we look at the taxonomies
-                    # which should be in the config.
-                    
-                    
-                #resources = [d for d in 
-                print(args['tags'])
-            
             return resources
     api.add_resource(Many, '/{PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
@@ -150,7 +144,8 @@ for singular_name,plural_name in types.items():
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
-        return {k:v for k,v in config.items() if k != 'notification-token'}
+        return {k:v for k,v in config.items() 
+                if k not in config['config-hidden-keys'] and k != 'config-hidden-keys'}
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
 
 
