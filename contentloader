@@ -41,19 +41,18 @@ class ContentLoader(object):
             "then update associated metadata and assets. Specify multiple times to get multiple "
             "documents at once."
         )
-        argparser.add_argument('--delete-db', action='store_true',
-            help='Delete any existing database named "{}".'.format(DB_NAME)
-        )
         argparser.add_argument('--watch-docs', action='store_true',
-            help="Initiate a request to watch drive for changes. This will expire in one day. "
-            "This does not fetch any documents."
+            help="Initiate a request to watch drive for changes. It will expire in one day."
         )
         argparser.add_argument('--stop-watching', action='store_true', 
-            help="Stop watching docs based on notification channels stored in the db."
+            help="If the db has any record of a watch request, request that it be cancelled."
         )
         argparser.add_argument('--report-broken-docs', action='store_true', 
             help="Produce a document containing information about documents which lack required "
             "fields for their type, as specified in the config document."
+        )
+        argparser.add_argument('--delete-db', action='store_true',
+            help='Delete any existing database named "{}".'.format(DB_NAME)
         )
         self.options,_ = argparser.parse_known_args()
 
@@ -61,7 +60,7 @@ class ContentLoader(object):
         self.couch = couchdb.Server()
         self.db = self.couch[DB_NAME] if DB_NAME in self.couch else self.couch.create(DB_NAME)
 
-        # Connect to Google Drive API
+        # Connect to Google Drive and get the root folder
         self.drive = driveclient.DriveClient(DRIVE_CLIENT_NAME,
             scopes='https://www.googleapis.com/auth/drive',
             service_account_json_filename=SERVICE_ACCOUNT_JSON_FILENAME)
@@ -80,19 +79,27 @@ class ContentLoader(object):
         # Decide behavior based on command line args
         # -------------------------------------------
 
-        # Delete database (which is always auto-created if needed, and could already be empty)
-        if self.options.delete_db:
-            confirm = input('Are you sure you want to delete the database "{}" [y/N]? '.format(DB_NAME))
+        # Watch for changes
+        if self.options.watch_docs:
+            self.unwatch()
+            self.watch()
+
+        # Stop watching for changes
+        elif self.options.stop_watching:
+            self.unwatch()
+
+        # Delete the database
+        elif self.options.delete_db:
+            confirm = input('Delete the database "{}" [y/N]? '.format(DB_NAME))
             if confirm.lower() == 'y':
                 self.unwatch()
                 del self.couch[DB_NAME]
-        # Handle change watching (the other components of this are in the apiserver)
-        elif self.options.watch_docs:
-            self.unwatch()
-            self.watch()
-        elif self.options.stop_watching:
-            self.unwatch()
-        # Or load some content
+
+        elif self.options.report_broken_docs:
+            #XXX: keep this separate from the real loader, as the lord intended
+            pass
+
+        # Load content
         else:
             #TODO: handle document renaming/deletion
             documents = self.get_documents()
