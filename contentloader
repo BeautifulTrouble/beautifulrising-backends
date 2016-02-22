@@ -202,7 +202,18 @@ class ContentLoader(object):
                     type['name'] = slugify(type['one'])
                 c['types'] += value
 
+        # Save the config before creating lots of temporary language-related data within it
         self.db_save(c, 'config:api')
+
+        # Key transformations have to take into account language suffixes, so this adds suffixed copies
+        # of synonyms, plural-keys, and plural-keys-collate (where each entry is a nested list).
+        add_language_suffixes = lambda D: [D.update(each) for each in
+            [{k+'-'+lang: [i+'-'+lang for i in v] if isinstance(v, list) else
+                          v+'-'+lang for k,v in D.items()} for lang in self.config['language-all']] ]
+        add_language_suffixes(c['synonyms'])
+        add_language_suffixes(c['plural-keys'])
+        add_language_suffixes(c['plural-keys-collate'])
+
         log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
 
 
