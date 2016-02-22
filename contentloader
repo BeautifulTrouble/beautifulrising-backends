@@ -15,6 +15,7 @@ import couchdb
 import driveclient
 import jinja2
 import langdetect
+from fuzzywuzzy.process import extractOne as fuzzy
 from apiclient.http import MediaIoBaseUpload
 
 from utils import *
@@ -130,6 +131,17 @@ class ContentLoader(object):
         Return the type data structure for the content item
         '''
         return next((T for T in self.config['types'] if T['name'] in content), {})
+
+
+    def find_module(self, module_or_name, module_list):
+        '''
+        Use fuzzy matching to find a module from a list
+        '''
+        module_name = module_or_name
+        if not isinstance(module_or_name, str):
+            module_name = module_or_name['title']
+        match, score = fuzzy(module_name, module_list, processor=lambda m: m['title'])
+        return match
 
 
     def db_save(self, doc, id=None):
