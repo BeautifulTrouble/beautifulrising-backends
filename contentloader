@@ -149,6 +149,7 @@ class ContentLoader(object):
         Write doc to couchdb, adding a revision if the document exists
         To clarify, this is a couchdb doc and not a google doc.
         '''
+        doc = {k:v for k,v in doc.items() if not k.startswith('_')}
         doc.update(_id=id or self.content_id(doc))
         try:
             doc.update(_rev=self.db[doc['_id']]['_rev'])
