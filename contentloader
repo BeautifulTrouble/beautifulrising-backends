@@ -159,45 +159,48 @@ class ContentLoader(object):
 
     def configure(self):
         '''
-        Fetch, parse and store the config document
+        Fetch, parse, set defaults, and store the config
         '''
         document = self.root.file(CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")
 
-        self.config = c = {}
-        data = archieml.loads(document.text)
+        self.config = c = archieml.loads(document.text)
+
+        # Hiding configuration options from the API
+        c.setdefault('config-hidden-keys', ['notification-token'])
 
         # Drive notifications
-        c['notification-url'] = data.get('notification-url', '')
-        c['notification-token'] = data.get('notification-token', '')
+        c.setdefault('notification-url', '')
+        c.setdefault('notification-token', '')
 
         # Language settings
-        c['language-default'] = data.get('language-default', 'en')
+        c.setdefault('language-default', 'en')
+        c.setdefault('language-all', ['en'])
+        c.setdefault('language-add', '')
+        c.setdefault('language-remove', '')
 
-        # Where and how to find published content 
-        c['content'] = data.get('content', ['^content$'])
-        c['published-keyword'] = data.get('published-keyword', r'(?i)\bdone$')
+        # How to distinguish published content
+        c.setdefault('published-filename-regex', r'(?i)\bdone$')
 
-        # Renaming synonyms
-        c['synonyms'] = data.get('synonyms', {})
+        # Renaming synonymous keys, including those with language-suffixes
+        c.setdefault('synonyms', {})
 
         # Shuffling content together
-        c['plural-separator'] = data.get('plural-separator', r'(?:\s*,|\s+&)\s+')
-        c['plural-keys'] = data.get('plural-keys', {})
-        c['collate'] = data.get('collate', {})
+        c.setdefault('plural-separator-regex', r'(?:\s*,|\s+and|\s+&)\s+')
+        c.setdefault('plural-keys', {})
+        c.setdefault('plural-keys-collate', {})
 
         # Associate assets files with a key and download them
-        c['assets'] = data.get('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
+        c.setdefault('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
 
         # Content type information
         c['types'] = []
-        for k,v in data.items():
-            if k.endswith('-types'):
-                for d in v:
-                    d['name'] = slugify(d['one'])
-                c['types'] += v
-                c[k] = v
+        for key,value in c.items():
+            if key.startswith('types-'):
+                for type in value:
+                    type['name'] = slugify(type['one'])
+                c['types'] += value
 
         self.db_save(c, 'config:api')
         log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
