@@ -241,7 +241,10 @@ class ContentLoader(object):
             for channel,resource in self.db['config:notification-channels'].items():
                 if channel not in ('_id', '_rev'):
                     try:
-                        self.drive.execute(self.drive.service.channels().stop(body={'id': channel, 'resourceId': resource}))
+                        self.drive.execute(self.drive.service.channels().stop(body={
+                            'id': channel, 
+                            'resourceId': resource,
+                        }))
                         log("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
                     except: pass
             del self.db['config:notification-channels']
@@ -249,20 +252,23 @@ class ContentLoader(object):
 
     def get_documents(self):
         '''
-        Get content by file ids, change ids or all documents
+        Get documents by file ids, change ids or all documents
         '''
         documents = []
-        # Get only the requested documents
+        # Get only the specifically requested documents by id or change id
         if self.options.changes or self.options.ids:
-            documents.extend(d for d in (self.drive.change(id) for id in self.options.changes) if d)
             documents.extend(d for d in (self.drive.get(id) for id in self.options.ids) if d)
-        # Get all documents from the content folders
+            documents.extend(d for d in (self.drive.get_change(id) for id in self.options.changes) if d)
+        # Get all documents
         else:
-            for folder in self.root.folders:
-                # Try to match one of the content types with this folder's name
-                if any(re.search(pat, folder.title) for pat in self.config['content']):
-                    log('find: content in drive folder "{}"'.format(folder.title))
-                    documents.extend(folder.documents)
+            # Recursive folder getter requires python3.3+ for "yield from"
+            def get_folders(root):
+                for folder in root.folders:
+                    yield folder
+                    yield from get_folders(folder)
+            for folder in get_folders(self.root):
+                log('find: content in drive folder "{}"'.format(folder.title))
+                documents.extend(folder.documents)
         return documents
 
 
