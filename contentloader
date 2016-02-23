@@ -71,14 +71,11 @@ class ContentLoader(object):
 
         # Master lists of content
         self.all_content = []
-        self.published_content = []
+        self.published_content_primary = []
+        self.published_content_translated = []
 
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
-
-        # -------------------------------------------
-        # Decide behavior based on command line args
-        # -------------------------------------------
 
         # Watch for changes
         if self.options.watch_docs:
@@ -96,26 +93,34 @@ class ContentLoader(object):
                 self.unwatch()
                 del self.couch[DB_NAME]
 
+        # Produce a report in the root folder about documents which lack required fields
         elif self.options.report_broken_docs:
-            #XXX: keep this separate from the real loader, as the lord intended
-            pass
+            self.all_content = filter(None, map(self.extract_and_transform, self.get_documents()))
+            self.filter_broken_content()
 
         # Load content
         else:
-            #TODO: handle document renaming/deletion
             documents = self.get_documents()
+            #TODO: handle document renaming/deletion
+            #TODO: in production always unwatch/watch
 
             for document in documents:
-                published = re.search(self.config['published-keyword'], document.title)
-                if published or self.options.report_broken_docs:
+                # A published document matches this regex
+                if re.search(self.config['published-filename-regex'], document.title):
                     content = self.extract_and_transform(document)
+                    if not content: 
+                        continue
                     self.all_content.append(content)
-                    if published:
-                        self.published_content.append(content)
+                    if content['lang'] == self.config['language-default']:
+                        self.published_content_primary.append(content)
+                    else:
+                        self.published_content_translated.append(content)
 
-            self.filter_broken_documents()
+            #TODO: ensure translated docs get fetched (from db) so merges can happen
+            self.merge_content_translations()
+            self.filter_broken_content()
             self.download_assets()
-            for content in self.published_content:
+            for content in self.published_content_primary:
                 self.db_save(content)
 
 
@@ -133,7 +138,7 @@ class ContentLoader(object):
         return next((T for T in self.config['types'] if T['name'] in content), {})
 
 
-    def find_module(self, module_or_name, module_list):
+    def find_module(self, module_or_name, module_list, thresh=0.3):
         '''
         Use fuzzy matching to find a module from a list
         '''
@@ -141,7 +146,7 @@ class ContentLoader(object):
         if not isinstance(module_or_name, str):
             module_name = module_or_name['title']
         match, score = fuzzy(module_name, module_list, processor=lambda m: m['title'])
-        return match
+        return match if score > thresh else None
 
 
     def db_save(self, doc, id=None):
@@ -267,8 +272,8 @@ class ContentLoader(object):
                     yield folder
                     yield from get_folders(folder)
             for folder in get_folders(self.root):
-                log('find: content in drive folder "{}"'.format(folder.title))
                 documents.extend(folder.documents)
+                log('find: content in drive folder "{}"'.format(folder.title))
         return documents
 
 
@@ -282,8 +287,6 @@ class ContentLoader(object):
         text = re.sub(r'(?:\[([a-z])\1?\])+$|^\[([a-z])\2?\].+$', '', text, flags=re.M) 
         content = archieml.loads(text)
 
-        #TODO: Strip as much whitespace from values as possible
-
         # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
             old_value = content.get(old_key)
@@ -293,17 +296,24 @@ class ContentLoader(object):
 
         # Figure out the content language
         if 'lang' not in content:
-            content['lang'] = self.config['language-default']
             corpus = '\n'.join(sorted((s for s in content.values() if isinstance(s, str)), key=len, reverse=True))
             try:
-                content['lang'] = langdetect.detect(corpus)
-            except: pass
+                lang = langdetect.detect(corpus)
+                assert lang in self.config['language-all']
+            except:
+                lang = self.config['language-default']
+            content['lang'] = lang
 
-        # Add a few useful bits
+        # Determine the type
         type = self.type_info(content).get('name', '')
         content['type'] = type
-        content['title'] = content.get(type, '')
-        content['slug'] = slugify(content['title'], allow=':')
+        content['title'] = title = content.get(type, '')
+        if not isinstance(title, str): 
+            log("skip: {} bad type information".format(document.id))
+            return
+
+        # Add a few useful bits
+        content['slug'] = slugify(content.get('title', ''), allow=':')
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
@@ -313,47 +323,87 @@ class ContentLoader(object):
             single, plural = content.get(singular_key), content.get(plural_key)
             if single:
                 content[plural_key] = [single]
-                del content[singular_key]
+                if plural_key != singular_key:
+                    del content[singular_key]
             if plural:
                 multiline = re.split(r'\s*\n\s*\n\s*', plural)
                 content[plural_key] = (multiline if len(multiline) > 1 else 
-                                       re.split(self.config['plural-separator'], plural))
+                                       re.split(self.config['plural-separator-regex'], plural))
 
         # Collate (zip) specific plural data together and give it new names
-        for result,mapping in self.config['collate'].items():
-            collated_lists = zip_longest(*(content.get(existing_key, []) 
-                                for existing_key in mapping.values()), fillvalue='')
-            collated_dicts = [dict(zip(mapping.keys(), L)) for L in collated_lists]
-            for old_key in mapping.values():
+        for output,plurals in self.config['plural-keys-collate'].items():
+            collated_lists = zip_longest(*(content.get(existing_key, []) for existing_key in plurals), fillvalue='')
+            # If the output key has a language suffix, remove it from the inner keys
+            if re.search('-(?:{})$'.format('|'.join(self.config['language-all'])), output):
+                sans_suffix = [self.config['plural-keys'][p][:-3] for p in plurals] 
+                collated_dicts = [dict(zip(sans_suffix, L)) for L in collated_lists]
+            # Otherwise create the inner keys normally
+            else:
+                collated_dicts = [dict(zip(map(self.config['plural-keys'].get, plurals), L)) for L in collated_lists]
+            for old_key in plurals:
                 content.pop(old_key, None)
-            content[result] = collated_dicts
+            if collated_dicts:
+                content[output] = collated_dicts
         
         log("extract: {} ({}: {})".format(document.id, type, content['title']))
         return content
 
 
-    def filter_broken_documents(self):
+    def merge_content_translations(self):
         '''
-        Remove docs from published_content if they have obvious content problems 
+        Assuming all necessary documents have already been fetched, merge translations
+        into the content object for the default language. They will be placed into a 
+        'translations' dictionary under two-letter language code keys.
         '''
-        missing = []
+        # Add translated content to a translations dict in each original language piece
+        for translation in self.published_content_translated:
+            original = self.find_module(translation.get('original', ''), self.published_content_primary)
+            if not original:
+                continue
+            translations = original.setdefault('translations', {})
+            translations[translation['lang']] = translation
+            log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], original['title']))
+
+        # Look through primary language documents and move translated keys into place
+        for module in self.published_content_primary:
+            module.setdefault('translations', {})
+            for lang in self.config['language-all']:
+                keys = [k for k in module if k.endswith('-'+lang)]
+                inline = {k[:-3]: module[k] for k in keys}
+                if inline:
+                    if lang == self.config['language-default']:
+                        module.update(inline)
+                    else:
+                        lang_dict = module['translations'].setdefault(lang, {})
+                        lang_dict.update(inline)
+                    [module.pop(k) for k in keys]
+                print(lang, '...:>', inline)
+
+        #TODO: descend into each translation and pull keys back out for other languages?
+
+
+    def filter_broken_content(self):
+        '''
+        Remove content with obvious content problems from published_content_primary
+        '''
+        broken = []
         for content in self.all_content:
             missing_items = []
-            required = re.split(self.config['plural-separator'], self.type_info(content).get('required', ''))
+            required = self.type_info(content).get('required', [])
             for requirement in filter(None, required):
                 if not any(content.get(field.strip()) for field in requirement.split('|')):
                     missing_items.append(requirement.replace('|', ' or '))
             if missing_items:
-                missing.append((content, missing_items))
-                if content in self.published_content:
-                    self.published_content.remove(content)
+                broken.append((content, missing_items))
+                if content in self.published_content_primary:
+                    self.published_content_primary.remove(content)
         if self.options.report_broken_docs:
-            self.report_broken_documents(missing)
+            self.report_broken_documents(broken)
 
 
     def download_assets(self):
         '''
-        This modifies published_content and should be called before the final db store.
+        This modifies published_content_primary and should be called before the final db store.
         '''
         for asset_spec in self.config['assets']:
             asset_folder = self.root.folder(asset_spec['source'])
@@ -363,7 +413,7 @@ class ContentLoader(object):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
                     # Find content items which require the asset
-                    for content in self.published_content:
+                    for content in self.published_content_primary:
                         asset_name = content.get(asset_spec['key'])
                         if asset_name == asset.title or asset_name == asset.title.rsplit('.')[0]:
                             # Update the filename
@@ -394,7 +444,7 @@ class ContentLoader(object):
             self.drive.execute(self.drive.service.files().insert(**params))
 
 
-    def report_broken_documents(self, missing):
+    def report_broken_documents(self, broken):
         report_name = 'Content Error Report'
         timestamp = datetime.datetime.utcnow()
         output = jinja2.Template('''
@@ -404,12 +454,12 @@ class ContentLoader(object):
                 Modifications to this file will be discarded.<br><em>Updated: {{ timestamp }} UTC</em>
             </p>
             <hr>
-            {% for content,missing_items in missing %}
+            {% for content,missing_items in broken %}
             <p>
                 <a href="{{ content.document_link }}">{{ content.document_title }}</a><br>
                 {% if content.authors %}
                 {% for author in content.authors %}
-                <strong>Author:</strong> {{ author.name }} {{ author.email }}<br>
+                <strong>Author:</strong> {{ author.author }} {{ author.email }}<br>
                 {% endfor %}
                 {% endif %}
                 <strong>Missing:</strong> {{ missing_items|join(', ') }}
