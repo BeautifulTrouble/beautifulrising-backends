@@ -28,7 +28,15 @@ api = Api(app)
 couch = couchdb.Server()
 db = couch['toolbox']
 
-config = db['config:api']
+
+class CouchDocumentAccessor(object):
+    def __init__(self, id):
+        self.id = id
+    def __getitem__(self, item):
+        return db[self.id].get(item, '')
+    def items(self):
+        return db[self.id].items()
+config = CouchDocumentAccessor('config:api')
 
 
 def flatten_args(args, sep=','):
@@ -55,6 +63,8 @@ def add_cors_headers(response):
     Tell browsers it's okay to load from this resource
     '''
     response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET')
     return response
 
 
@@ -94,6 +104,7 @@ def notify():
     # TODO: new document tracking system by id
     elif state == 'delete':
         print('delete', request.get_json())
+        # XXX: pid = Popen([sys.executable, "contentloader", "--delete-id", doc_id]).pid
 
     # Attempt to invoke the content loader
     elif state == 'change':
@@ -110,45 +121,73 @@ def notify():
     return ('', 204)
 
 
-# In lieu of a proper couchdb design document, here's a temporary query
-#query_by_type = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}"
+def filter_by_language(resources, args):
+    '''
+    Filter a collection of resources down to a single language
+    '''
+    language_all = config['language-all']
+    language_add = config['language-add']
+    language_default = config['language-default']
+    language_remove = config['language-remove']
+
+    # TODO: if two languages are given, prefer the non-default one
+    # Get one valid language no matter what
+    lang = ((set(language_all) & set(args.get('lang', ()))) or {language_default}).pop()
+
+    output = []
+    for resource in resources:
+        translations = resource.pop('translations')
+        if lang == language_default:
+            output.append(resource)
+        elif lang in translations:
+            # Merge language-neutral and language-specific keys
+            preserve = {k:v for k,v in resource.items() if k in language_add}
+            resource.update({k:v for k,v in translations[lang].items() if k not in language_remove})
+            for k,v in preserve.items():
+                item_in_translated_language = resource[k]
+                resource[k] = v
+                #TODO: update language-add to allow filtering because reality bites
+                if isinstance(item_in_translated_language, list):
+                    resource[k] += item_in_translated_language
+                else:
+                    log('warning: {} in [language-add] is not a list for {}'.format(k, resource['title']))
+            output.append(resource)
+    return output
 
 
 # Get content types and create endpoints
 types = {slugify(T['one']): slugify(T['many']) for T in config['types']}
 for singular_name,plural_name in types.items():
-    
     class Many(Resource):
         type = singular_name
         query = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}" % singular_name
-
         def get(self):
             args = flatten_args(request.args)
             try:
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
-            return resources
+            return filter_by_language(resources, args)
     api.add_resource(Many, '/{PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
 
     class One(Resource):
         type = singular_name
         def get(self, id):
+            args = flatten_args(request.args)
             try:
                 resource = db['{}:{}'.format(self.type, id)]
             except ResourceNotFound: raise NotFound
-            return resource
+            return filter_by_language([resource], args)[0]
     api.add_resource(One, '/{PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
-            
+
 
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
-        return {k:v for k,v in config.items() 
-                if k not in config['config-hidden-keys'] and k != 'config-hidden-keys'}
+        return {k:v for k,v in config.items() if k not in config['config-hidden-keys']}
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
 
 
 if __name__ == '__main__':
-    app.run(port=PORT, debug='debug' in sys.argv)
+    app.run(port=PORT, debug='--debug' in sys.argv)
 
