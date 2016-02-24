@@ -71,8 +71,8 @@ class ContentLoader(object):
 
         # Master lists of content
         self.all_content = []
-        self.published_content_primary = []
-        self.published_content_translated = []
+        #self.published_content_primary = []
+        #self.published_content_translated = []
 
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
@@ -95,32 +95,26 @@ class ContentLoader(object):
 
         # Produce a report in the root folder about documents which lack required fields
         elif self.options.report_broken_docs:
-            self.all_content = filter(None, map(self.extract_and_transform, self.get_documents()))
+            documents = self.get_documents()
+            self.all_content = [c for c in map(self.extract_and_transform, documents) if c]
             self.filter_broken_content()
 
         # Load content
         else:
-            documents = self.get_documents()
             #TODO: handle document renaming/deletion
             #TODO: in production always unwatch/watch
+            is_published = lambda doc: re.search(self.config['published-filename-regex'], doc.title)
 
-            for document in documents:
-                # A published document matches this regex
-                if re.search(self.config['published-filename-regex'], document.title):
-                    content = self.extract_and_transform(document)
-                    if not content: 
-                        continue
-                    self.all_content.append(content)
-                    if content['lang'] == self.config['language-default']:
-                        self.published_content_primary.append(content)
-                    else:
-                        self.published_content_translated.append(content)
+            documents = filter(is_published, self.get_documents())
+            self.all_content = [c for c in map(self.extract_and_transform, documents) if c]
 
             #TODO: ensure translated docs get fetched (from db) so merges can happen
-            self.merge_content_translations()
-            self.filter_broken_content()
+            self.merge_translations()
+
+            #TODO: filter_broken_content needs re-working
+            #self.filter_broken_content()
             self.download_assets()
-            for content in self.published_content_primary:
+            for content in self.all_content:
                 self.db_save(content)
 
 
@@ -294,16 +288,6 @@ class ContentLoader(object):
                 content[new_key] = old_value
                 del content[old_key]
 
-        # Figure out the content language
-        if 'lang' not in content:
-            corpus = '\n'.join(sorted((s for s in content.values() if isinstance(s, str)), key=len, reverse=True))
-            try:
-                lang = langdetect.detect(corpus)
-                assert lang in self.config['language-all']
-            except:
-                lang = self.config['language-default']
-            content['lang'] = lang
-
         # Determine the type
         type = self.type_info(content).get('name', '')
         content['type'] = type
@@ -349,15 +333,41 @@ class ContentLoader(object):
         return content
 
 
-    def merge_content_translations(self):
+    def merge_translations(self):
         '''
         Assuming all necessary documents have already been fetched, merge translations
         into the content object for the default language. They will be placed into a 
         'translations' dictionary under two-letter language code keys.
         '''
+        language_all = self.config['language-all']
+        language_default = self.config['language-default']
+        language_suffixes = ['-'+lang for lang in language_all]
+
+        content_primary = []
+        content_translated = []
+
+        # Figure out the content languages
+        for content in self.all_content:
+            if 'lang' not in content:
+                text = [v for k,v in content.items() if isinstance(v, str) and k[-3:] not in language_suffixes]
+                corpus = '\n'.join(sorted(text, key=len, reverse=True))
+                try:
+                    lang = langdetect.detect(corpus)
+                    assert lang in self.config['language-all']
+                except:
+                    lang = self.config['language-default']
+                content['lang'] = lang
+
+        # Sort content by language
+        for content in self.all_content:
+            if content['lang'] == language_default:
+                content_primary.append(content)
+            else:
+                content_translated.append(content)
+
         # Add translated content to a translations dict in each original language piece
-        for translation in self.published_content_translated:
-            original = self.find_module(translation.get('original', ''), self.published_content_primary)
+        for translation in content_translated:
+            original = self.find_module(translation.get('original', ''), content_primary)
             if not original:
                 continue
             translations = original.setdefault('translations', {})
@@ -365,7 +375,7 @@ class ContentLoader(object):
             log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], original['title']))
 
         # Look through primary language documents and move translated keys into place
-        for module in self.published_content_primary:
+        for module in content_primary:
             module.setdefault('translations', {})
             for lang in self.config['language-all']:
                 keys = [k for k in module if k.endswith('-'+lang)]
@@ -379,6 +389,8 @@ class ContentLoader(object):
                     [module.pop(k) for k in keys]
                 print(lang, '...:>', inline)
 
+        #TODO: stop implying the existence of this and start passing it like a grownup
+        self.all_content = content_primary
         #TODO: descend into each translation and pull keys back out for other languages?
 
 
@@ -403,7 +415,7 @@ class ContentLoader(object):
 
     def download_assets(self):
         '''
-        This modifies published_content_primary and should be called before the final db store.
+        This modifies all_content and should be called before the final db store.
         '''
         for asset_spec in self.config['assets']:
             asset_folder = self.root.folder(asset_spec['source'])
@@ -413,7 +425,7 @@ class ContentLoader(object):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
                     # Find content items which require the asset
-                    for content in self.published_content_primary:
+                    for content in self.all_content:
                         asset_name = content.get(asset_spec['key'])
                         if asset_name == asset.title or asset_name == asset.title.rsplit('.')[0]:
                             # Update the filename
