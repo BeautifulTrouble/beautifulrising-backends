@@ -37,7 +37,7 @@ def script_subdirectory(name):
     subdirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)), name)
     if not os.path.exists(subdirectory):
         os.makedirs(subdirectory)
-        log('Created directory "{}"'.format(subdirectory))
+        log('mkdir: {}'.format(subdirectory))
     os.chdir(subdirectory)
     try: 
         yield
