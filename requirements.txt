@@ -1,5 +1,5 @@
--e git+https://github.com/adrian-the-git/driveclient@master#egg=driveclient-master
--e git+https://github.com/brainkim/archieml-python.git@v0.3.0#egg=archieml-master
+git+https://github.com/adrian-the-git/driveclient@master
+git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
 flask
 flask-restful
 couchdb
