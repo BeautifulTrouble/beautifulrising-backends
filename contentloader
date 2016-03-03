@@ -397,9 +397,6 @@ class ContentLoader(object):
         for content in all_content:
             required_sets = [r.split('|') for r in self.type_info(content).get('required', [])]
             missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
-            print('xxx', content['title'], required_sets, missing_items)
-            print([content.get(k) for s in required_sets for k in s])
-            print(content)
             if missing_items:
                 content['missing-items'] = missing_items
                 log('remove:', content['title'], missing_items)
