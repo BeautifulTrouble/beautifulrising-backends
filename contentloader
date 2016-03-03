@@ -69,11 +69,6 @@ class ContentLoader(object):
         if not self.root:
             die("Can't find the root folder!")
 
-        # Master lists of content
-        self.all_content = []
-        #self.published_content_primary = []
-        #self.published_content_translated = []
-
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
 
@@ -96,8 +91,8 @@ class ContentLoader(object):
         # Produce a report in the root folder about documents which lack required fields
         elif self.options.report_broken_docs:
             documents = self.get_documents()
-            self.all_content = [c for c in map(self.extract_and_transform, documents) if c]
-            self.filter_broken_content()
+            all_content = [c for c in map(self.extract_and_transform, documents) if c]
+            all_content = self.remove_broken_content(all_content, report=True)
 
         # Load content
         else:
@@ -106,15 +101,15 @@ class ContentLoader(object):
             is_published = lambda doc: re.search(self.config['published-filename-regex'], doc.title)
 
             documents = filter(is_published, self.get_documents())
-            self.all_content = [c for c in map(self.extract_and_transform, documents) if c]
+            all_content = [c for c in map(self.extract_and_transform, documents) if c]
 
             #TODO: ensure translated docs get fetched (from db) so merges can happen
-            self.merge_translations()
+            all_content = self.merge_translations(all_content)
 
-            #TODO: filter_broken_content needs re-working
-            #self.filter_broken_content()
-            self.download_assets()
-            for content in self.all_content:
+            all_content = self.remove_broken_content(all_content)
+            self.download_assets(all_content)
+
+            for content in all_content:
                 self.db_save(content)
 
 
@@ -298,9 +293,9 @@ class ContentLoader(object):
 
         # Add a few useful bits
         content['slug'] = slugify(content.get('title', ''), allow=':')
-        content['document_id'] = document.id
-        content['document_link'] = document.alternateLink
-        content['document_title'] = document.title
+        content['document-id'] = document.id
+        content['document-link'] = document.alternateLink
+        content['document-title'] = document.title
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():
@@ -333,34 +328,35 @@ class ContentLoader(object):
         return content
 
 
-    def merge_translations(self):
+    def add_language_tag(self, content):
+        '''
+        Add language tag to a content item
+        '''
+        language_suffixes = ['-'+lang for lang in self.config['language-all']]
+        if 'lang' not in content:
+            text = [v for k,v in content.items() if isinstance(v, str) and k[-3:] not in language_suffixes]
+            corpus = '\n'.join(sorted(text, key=len, reverse=True))
+            try:
+                lang = langdetect.detect(corpus)
+                assert lang in self.config['language-all']
+            except:
+                lang = self.config['language-default']
+            content['lang'] = lang
+
+
+    def merge_translations(self, all_content):
         '''
         Assuming all necessary documents have already been fetched, merge translations
         into the content object for the default language. They will be placed into a 
         'translations' dictionary under two-letter language code keys.
         '''
-        language_all = self.config['language-all']
-        language_default = self.config['language-default']
-        language_suffixes = ['-'+lang for lang in language_all]
-
         content_primary = []
         content_translated = []
 
-        # Figure out the content languages
-        for content in self.all_content:
-            if 'lang' not in content:
-                text = [v for k,v in content.items() if isinstance(v, str) and k[-3:] not in language_suffixes]
-                corpus = '\n'.join(sorted(text, key=len, reverse=True))
-                try:
-                    lang = langdetect.detect(corpus)
-                    assert lang in self.config['language-all']
-                except:
-                    lang = self.config['language-default']
-                content['lang'] = lang
-
         # Sort content by language
-        for content in self.all_content:
-            if content['lang'] == language_default:
+        for content in all_content:
+            self.add_language_tag(content)
+            if content['lang'] == self.config['language-default']:
                 content_primary.append(content)
             else:
                 content_translated.append(content)
@@ -387,33 +383,61 @@ class ContentLoader(object):
                         lang_dict = module['translations'].setdefault(lang, {})
                         lang_dict.update(inline)
                     [module.pop(k) for k in keys]
-                print(lang, '...:>', inline)
+                #TODO: remove
+                print(lang, '-=>', inline)
 
-        #TODO: stop implying the existence of this and start passing it like a grownup
-        self.all_content = content_primary
         #TODO: descend into each translation and pull keys back out for other languages?
+        return content_primary
 
 
-    def filter_broken_content(self):
+    def remove_broken_content(self, all_content, report=False):
         '''
-        Remove content with obvious content problems from published_content_primary
+        Remove content with obvious content problems from all_content
         '''
-        broken = []
-        for content in self.all_content:
-            missing_items = []
-            required = self.type_info(content).get('required', [])
-            for requirement in filter(None, required):
-                if not any(content.get(field.strip()) for field in requirement.split('|')):
-                    missing_items.append(requirement.replace('|', ' or '))
+        for content in all_content:
+            required_sets = [r.split('|') for r in self.type_info(content).get('required', [])]
+            missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
+            print('xxx', content['title'], required_sets, missing_items)
+            print([content.get(k) for s in required_sets for k in s])
+            print(content)
             if missing_items:
-                broken.append((content, missing_items))
-                if content in self.published_content_primary:
-                    self.published_content_primary.remove(content)
-        if self.options.report_broken_docs:
-            self.report_broken_documents(broken)
+                content['missing-items'] = missing_items
+                log('remove:', content['title'], missing_items)
+        good_content = [c for c in all_content if 'missing-items' not in c]
+
+        if report:
+            title = 'Content Error Report'
+            timestamp = datetime.datetime.utcnow()
+            html = jinja2.Template('''
+                <style>* { font-family: "Consolas"; }</style>
+                <h1>{{ title }}</h1>
+                <p>
+                    Modifications to this file will be discarded.<br>
+                    Please disregard missing keys in translated pieces for now.<br>
+                    <em>Updated: {{ timestamp }} UTC</em><br>
+                </p>
+                <hr>
+                {% for content in all_content %}
+                {% if 'missing-items' in content %}
+                <p>
+                    <a href="{{ content['document-link'] }}">{{ content['document-title'] }}</a><br>
+                    {% if content.authors %}
+                    {% for author in content.authors %}
+                    <strong>Author:</strong> {{ author.author }} {{ author.email }}<br>
+                    {% endfor %}
+                    {% endif %}
+                    <strong>Missing:</strong> {{ content['missing-items']|join(', ') }}
+                </p>
+                <p></p>
+                {% endif %}
+                {% endfor %}
+            ''').render({k:v for k,v in vars().items() if k != 'self'})
+            self.root.write_html(title, html)
+
+        return good_content
 
 
-    def download_assets(self):
+    def download_assets(self, all_content):
         '''
         This modifies all_content and should be called before the final db store.
         '''
@@ -425,7 +449,7 @@ class ContentLoader(object):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
                     # Find content items which require the asset
-                    for content in self.all_content:
+                    for content in all_content:
                         asset_name = content.get(asset_spec['key'])
                         if asset_name == asset.title or asset_name == asset.title.rsplit('.')[0]:
                             # Update the filename
@@ -434,52 +458,6 @@ class ContentLoader(object):
                             #asset.save_as(asset.title)
                             log('download: asset "{}"'.format(asset.title))
 
-
-    def write_document(self, name, folder, bytestring, source_mimetype='text/plain'):
-        '''
-        Given a filename and a parent folder, create or update a document with a bytestring
-        Docs will be converted from their source_mimetype
-        '''
-        params = {
-            'body': {
-                'title': name,
-                'mimeType': 'application/vnd.google-apps.document',
-            },
-            'convert': True,
-            'media_body': MediaIoBaseUpload(BytesIO(bytestring), mimetype=source_mimetype),
-        }
-        existing_file = folder.file(name)
-        if existing_file:
-            self.drive.execute(self.drive.service.files().update(fileId=existing_file.id, **params))
-        else:
-            params['body']['parents'] = [{'id': folder.id}]
-            self.drive.execute(self.drive.service.files().insert(**params))
-
-
-    def report_broken_documents(self, broken):
-        report_name = 'Content Error Report'
-        timestamp = datetime.datetime.utcnow()
-        output = jinja2.Template('''
-            <style>* { font-family: "Consolas"; }</style>
-            <h1>{{ report_name }}</h1>
-            <p>
-                Modifications to this file will be discarded.<br><em>Updated: {{ timestamp }} UTC</em>
-            </p>
-            <hr>
-            {% for content,missing_items in broken %}
-            <p>
-                <a href="{{ content.document_link }}">{{ content.document_title }}</a><br>
-                {% if content.authors %}
-                {% for author in content.authors %}
-                <strong>Author:</strong> {{ author.author }} {{ author.email }}<br>
-                {% endfor %}
-                {% endif %}
-                <strong>Missing:</strong> {{ missing_items|join(', ') }}
-            </p><p></p>
-            {% endfor %}
-        ''').render({k:v for k,v in vars().items() if k != 'self'})
-        self.write_document(report_name, self.root, output.encode('ascii', 'xmlcharrefreplace'), 'text/html')
-                
 
 if __name__ == '__main__':
     ContentLoader()
