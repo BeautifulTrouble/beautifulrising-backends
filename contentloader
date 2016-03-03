@@ -420,7 +420,7 @@ class ContentLoader(object):
                     <a href="{{ content['document-link'] }}">{{ content['document-title'] }}</a><br>
                     {% if content.authors %}
                     {% for author in content.authors %}
-                    <strong>Author:</strong> {{ author.author }} {{ author.email }}<br>
+                    <strong>Author:</strong> {{ author }}<br>
                     {% endfor %}
                     {% endif %}
                     <strong>Missing:</strong> {{ content['missing-items']|join(', ') }}
