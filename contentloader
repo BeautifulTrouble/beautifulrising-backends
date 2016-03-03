@@ -92,7 +92,7 @@ class ContentLoader(object):
         elif self.options.report_broken_docs:
             documents = self.get_documents()
             all_content = [c for c in map(self.extract_and_transform, documents) if c]
-            all_content = self.remove_broken_content(all_content, report=True)
+            all_content = self.filter_broken_content(all_content, report=True)
 
         # Load content
         else:
@@ -106,7 +106,7 @@ class ContentLoader(object):
             #TODO: ensure translated docs get fetched (from db) so merges can happen
             all_content = self.merge_translations(all_content)
 
-            all_content = self.remove_broken_content(all_content)
+            all_content = self.filter_broken_content(all_content)
             self.download_assets(all_content)
 
             for content in all_content:
@@ -390,7 +390,7 @@ class ContentLoader(object):
         return content_primary
 
 
-    def remove_broken_content(self, all_content, report=False):
+    def filter_broken_content(self, all_content, report=False):
         '''
         Remove content with obvious content problems from all_content
         '''
@@ -399,7 +399,7 @@ class ContentLoader(object):
             missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
             if missing_items:
                 content['missing-items'] = missing_items
-                log('remove:', content['title'], missing_items)
+                log('skip:', content['title'], missing_items)
         good_content = [c for c in all_content if 'missing-items' not in c]
 
         if report:
@@ -454,6 +454,7 @@ class ContentLoader(object):
                             # TODO: Make this smart enough to prevent re-downloading
                             #asset.save_as(asset.title)
                             log('download: asset "{}"'.format(asset.title))
+        return all_content
 
 
 if __name__ == '__main__':
