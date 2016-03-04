@@ -99,9 +99,9 @@ class ContentLoader(object):
             #TODO: handle document renaming/deletion
             #TODO: in production always unwatch/watch
             is_published = lambda doc: re.search(self.config['published-filename-regex'], doc.title)
+            published_documents = filter(is_published, self.get_documents())
 
-            documents = filter(is_published, self.get_documents())
-            all_content = [c for c in map(self.extract_and_transform, documents) if c]
+            all_content = [c for c in map(self.extract_and_transform, published_documents) if c]
 
             #TODO: ensure translated docs get fetched (from db) so merges can happen
             all_content = self.merge_translations(all_content)
@@ -111,13 +111,6 @@ class ContentLoader(object):
 
             for content in all_content:
                 self.db_save(content)
-
-
-    def content_id(self, content):
-        '''
-        Produce consistent ids for couchdb
-        '''
-        return '{type}:{slug}'.format(**content)
 
 
     def type_info(self, content):
@@ -144,7 +137,12 @@ class ContentLoader(object):
         To clarify, this is a couchdb doc and not a google doc.
         '''
         doc = {k:v for k,v in doc.items() if not k.startswith('_')}
-        doc.update(_id=id or self.content_id(doc))
+
+        # Ensure the existence of _id, type and slug
+        id = id or '{type}:{slug}'.format(**doc)
+        type, slug = id.split(':', maxsplit=1)
+        doc.update(_id=id, type=type, slug=slug)
+
         try:
             doc.update(_rev=self.db[doc['_id']]['_rev'])
         except couchdb.http.ResourceNotFound: pass
@@ -184,6 +182,9 @@ class ContentLoader(object):
         c.setdefault('plural-separator-regex', r'(?:\s*,|\s+and|\s+&)\s+')
         c.setdefault('plural-keys', {})
         c.setdefault('plural-keys-collate', {})
+
+        # Relationships between content items
+        c.setdefault('relationships', {})
 
         # Associate assets files with a key and download them
         c.setdefault('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
