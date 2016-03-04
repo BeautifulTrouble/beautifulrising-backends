@@ -6,6 +6,7 @@ autovenv.run()
 
 import argparse
 import datetime
+import pprint
 import re
 from io import BytesIO
 from itertools import zip_longest
@@ -96,6 +97,8 @@ class ContentLoader(object):
 
         # Load content
         else:
+            db_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document-id' in d.doc]
+
             #TODO: handle document renaming/deletion
             #TODO: in production always unwatch/watch
             is_published = lambda doc: re.search(self.config['published-filename-regex'], doc.title)
@@ -137,12 +140,7 @@ class ContentLoader(object):
         To clarify, this is a couchdb doc and not a google doc.
         '''
         doc = {k:v for k,v in doc.items() if not k.startswith('_')}
-
-        # Ensure the existence of _id, type and slug
-        id = id or '{type}:{slug}'.format(**doc)
-        type, slug = id.split(':', maxsplit=1)
-        doc.update(_id=id, type=type, slug=slug)
-
+        doc.update(_id=id or '{type}:{slug}'.format(**doc))
         try:
             doc.update(_rev=self.db[doc['_id']]['_rev'])
         except couchdb.http.ResourceNotFound: pass

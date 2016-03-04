@@ -96,12 +96,8 @@ def notify():
             channels = db['config:notification-channels']
             channels[channel_id] = resource_id
         except ResourceNotFound:
-            channels = {
-                '_id': 'config:notification-channels',
-                'type': 'config',
-                'slug': 'notification-channels',
-                channel_id: resource_id,
-            }
+            channels = {channel_id: resource_id}
+            channels.update(_id='config:notification-channels')
         db.save(channels)
 
     # Notify that a document is no longer in the collection
