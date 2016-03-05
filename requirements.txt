@@ -7,3 +7,4 @@ unidecode
 langdetect
 fuzzywuzzy
 python-Levenshtein
+python-magic

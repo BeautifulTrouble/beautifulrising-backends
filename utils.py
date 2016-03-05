@@ -6,6 +6,7 @@ import re
 import sys
 from functools import reduce
 
+import magic
 import unidecode
 
     
@@ -43,6 +44,13 @@ def script_subdirectory(name):
         yield
     finally: 
         os.chdir(cwd)
+
+
+def mimetype(filename):
+    '''
+    Convenience wrapper for python-magic
+    '''
+    return magic.from_file(filename, mime=True).decode()
 
 
 def slugify(s, allow=''):
@@ -86,6 +94,7 @@ def die(*s):
 __all__ = [
     'script_directory', 
     'script_subdirectory', 
+    'mimetype',
     'slugify', 
     'strip_smartquotes',
     'log', 
