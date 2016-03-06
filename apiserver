@@ -144,10 +144,8 @@ def filter_by_language(resources, args):
                 if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
                     resource[k] += item_in_default_language
             resource['lang'] = lang
-            output.append(resource)
         # In the default language simply removing the translations is enough
-        else:
-            output.append(resource)
+        output.append(resource)
     return output
 
 
