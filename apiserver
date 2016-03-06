@@ -136,16 +136,17 @@ def filter_by_language(resources, args):
     output = []
     for resource in resources:
         translations = resource.pop('translations')
-        # In the default language simply removing the translations is enough
-        if lang == language_default:
-            output.append(resource)
         # In translated languages merge data using language-add and language-remove config items
-        elif lang in translations:
+        if lang in translations:
             preserved = {k:v for k,v in resource.items() if k in language_add}
             resource.update({k:v for k,v in translations[lang].items() if k not in language_remove})
             for k,item_in_default_language in preserved.items():
                 if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
                     resource[k] += item_in_default_language
+            resource['lang'] = lang
+            output.append(resource)
+        # In the default language simply removing the translations is enough
+        else:
             output.append(resource)
     return output
 
