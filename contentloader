@@ -31,31 +31,26 @@ SERVICE_ACCOUNT_JSON_FILENAME = 'beautiful-rising-eae5ff71ae04.json'
 class ContentLoader(object):
     def __init__(self):
         # Parse command line arguments
-        argparser = argparse.ArgumentParser(description="")
-        argparser.add_argument('--id', type=str, metavar='DOCUMENT_ID', action='append', 
+        arg_parser = argparse.ArgumentParser(description="")
+        arg_parser_group = arg_parser.add_mutually_exclusive_group()
+        arg_parser_group.add_argument('--id', type=str, metavar='DOCUMENT_ID', action='append', 
             default=[], dest='ids', help="Fetch a single document by its globally unique id, "
             "then update associated metadata and assets. Specify multiple times to get multiple "
-            "documents at once."
-        )
-        argparser.add_argument('--change-id', type=str, metavar='CHANGE_ID', action='append', 
+            "documents at once.")
+        arg_parser_group.add_argument('--change-id', type=str, metavar='CHANGE_ID', action='append', 
             default=[], dest='changes', help="Fetch a single document by its ephemeral change id, "
             "then update associated metadata and assets. Specify multiple times to get multiple "
-            "documents at once."
-        )
-        argparser.add_argument('--watch-docs', action='store_true',
-            help="Initiate a request to watch drive for changes. It will expire in one day."
-        )
-        argparser.add_argument('--stop-watching', action='store_true', 
-            help="If the db has any record of a watch request, request that it be cancelled."
-        )
-        argparser.add_argument('--report-broken-docs', action='store_true', 
+            "documents at once.")
+        arg_parser_group.add_argument('--watch-docs', action='store_true',
+            help="Initiate a request to watch drive for changes. It will expire in one day.")
+        arg_parser_group.add_argument('--stop-watching', action='store_true', 
+            help="If the db has any record of a watch request, request that it be cancelled.")
+        arg_parser_group.add_argument('--report-broken-docs', action='store_true', 
             help="Produce a document containing information about documents which lack required "
-            "fields for their type, as specified in the config document."
-        )
-        argparser.add_argument('--delete-db', action='store_true',
-            help='Delete any existing database named "{}".'.format(DB_NAME)
-        )
-        self.options,_ = argparser.parse_known_args()
+            "fields for their type, as specified in the config document.")
+        arg_parser_group.add_argument('--delete-db', action='store_true',
+            help='Delete any existing database named "{}".'.format(DB_NAME))
+        self.options,_ = arg_parser.parse_known_args()
 
         # Connect to couchdb
         self.couch = couchdb.Server()
@@ -248,7 +243,7 @@ class ContentLoader(object):
         '''
         documents = []
         # Get only the specifically requested documents by id or change id
-        if self.options.changes or self.options.ids:
+        if self.options.ids or self.options.changes:
             documents.extend(d for d in (self.drive.get(id) for id in self.options.ids) if d)
             documents.extend(d for d in (self.drive.get_change(id) for id in self.options.changes) if d)
         # Get all documents
@@ -397,7 +392,7 @@ class ContentLoader(object):
             missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
             if missing_items:
                 content['missing-items'] = missing_items
-                log('skip:', content['title'], missing_items)
+                log('missing:', content['title'], missing_items)
         good_content = [c for c in all_content if 'missing-items' not in c]
 
         if report:
@@ -436,31 +431,31 @@ class ContentLoader(object):
         '''
         This modifies all_content and should be called before the final db store.
         '''
-        #TODO: improve, add image scaling etc
-
+        # TODO: reduce redundant checks, add image scaling, etc
         for asset_spec in self.config['assets']:
             asset_folder = self.root.folder(asset_spec['source'])
             if not asset_folder:
                 continue
+            asset_key = asset_spec['key']
             with script_subdirectory(asset_spec['destination']):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
-                    # Find content items which require the asset
+                    asset_name = os.path.splitext(asset.title.lower())[0]
+                    # Then find content items which require the asset
                     for content in all_content:
-                        desired_asset = content.get(asset_spec['key'], '').lower()
-                        current_asset = asset.title.lower()
-                        if (desired_asset == current_asset or
-                            desired_asset == current_asset.rsplit('.', maxsplit=1)[0]):
-                            # Update (slugify) the filename
+                        desired_asset = os.path.splitext(content.get(asset_key, '').lower())[0]
+                        if (desired_asset == asset_name):
+                            # Slugify and update the filename
                             name, ext = os.path.splitext(asset.title)
                             filename = slugify(name) + ext
-                            content[asset_spec['key']] = filename
-                            # TODO: Make this smart enough to prevent re-downloading
-                            #asset.save_as(filename)
+                            content[asset_key] = filename
+                            # Download the actual file
+                            asset.save_as(filename)
                             log('download: asset "{}"'.format(filename))
         return all_content
 
 
 if __name__ == '__main__':
-    ContentLoader()
+    with only_one_process():
+        ContentLoader()
 

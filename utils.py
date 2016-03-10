@@ -1,6 +1,7 @@
 
 import contextlib
 import datetime
+import fcntl
 import os
 import re
 import sys
@@ -9,7 +10,7 @@ from functools import reduce
 import magic
 import unidecode
 
-    
+
 @contextlib.contextmanager
 def script_directory():
     '''
@@ -44,6 +45,22 @@ def script_subdirectory(name):
         yield
     finally: 
         os.chdir(cwd)
+
+
+@contextlib.contextmanager
+def only_one_process(name=None):
+    '''
+    Use a file lock to ensure only one process runs at a time
+    '''
+    if not name:
+        #TODO: Improve upon this for situations with a deeper stack
+        name = os.path.splitext(os.path.basename(sys._getframe(2).f_globals['__file__']))[0]
+    with script_directory(), open(name + '.lock', 'w') as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def mimetype(filename):
@@ -94,6 +111,7 @@ def die(*s):
 __all__ = [
     'script_directory', 
     'script_subdirectory', 
+    'only_one_process',
     'mimetype',
     'slugify', 
     'strip_smartquotes',
