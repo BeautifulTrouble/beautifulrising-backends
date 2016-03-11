@@ -7,9 +7,10 @@ autovenv.run()
 import argparse
 import datetime
 import os
-import pprint
 import re
+import sys
 from itertools import zip_longest
+from pprint import pprint
 
 import archieml
 import couchdb
@@ -91,18 +92,24 @@ class ContentLoader(object):
 
         # Load content
         else:
-            db_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document-id' in d.doc]
-
-            #TODO: handle document renaming/deletion
             #TODO: in production always unwatch/watch
-            is_published = lambda doc: re.search(self.config['published-filename-regex'], doc.title)
-            published_documents = filter(is_published, self.get_documents())
+            #TODO: handle document renaming/deletion
 
-            all_content = [c for c in map(self.extract_and_transform, published_documents) if c]
+            # Fetch all the existing content from the db
+            existing_content = {d.doc['slug']: d.doc for d in self.db.view('_all_docs', include_docs=True) 
+                                if 'document-id' in d.doc}
 
-            #TODO: ensure translated docs get fetched (from db) so merges can happen
+            # Identify published documents by their filenames
+            published = re.compile(self.config['published-filename-regex']).search
+            published_documents = (d for d in self.get_documents() if published(d.title))
+
+            # Extract new content and merge it with the existing, preserving any translations
+            for content in filter(None, map(self.extract_and_transform, published_documents)):
+                content['translations'] = existing_content.get(content['slug'], {}).get('translations', {})
+                existing_content[content['slug']] = content
+
+            all_content = list(existing_content.values())
             all_content = self.merge_translations(all_content)
-
             all_content = self.filter_broken_content(all_content)
             self.download_assets(all_content)
 
@@ -124,8 +131,9 @@ class ContentLoader(object):
         module_name = module_or_name
         if not isinstance(module_or_name, str):
             module_name = module_or_name['title']
-        match, score = fuzzy(module_name, module_list, processor=lambda m: m['title'])
-        return match if score > thresh else None
+        match = fuzzy(module_name, module_list, processor=lambda m: m['title'])
+        if match and match[1] > thresh:
+            return match[0]
 
 
     def db_save(self, doc, id=None):
@@ -325,8 +333,8 @@ class ContentLoader(object):
         '''
         Add language tag to a content item
         '''
-        language_suffixes = ['-'+lang for lang in self.config['language-all']]
         if 'lang' not in content:
+            language_suffixes = ['-'+lang for lang in self.config['language-all']]
             text = [v for k,v in content.items() if isinstance(v, str) and k[-3:] not in language_suffixes]
             corpus = '\n'.join(sorted(text, key=len, reverse=True))
             try:
@@ -376,8 +384,7 @@ class ContentLoader(object):
                         lang_dict = module['translations'].setdefault(lang, {})
                         lang_dict.update(inline)
                     [module.pop(k) for k in keys]
-                    #TODO: remove
-                    print(lang, '-=>', inline)
+                    print(lang, '-=>', inline) #TODO: remove
 
         #TODO: descend into each translation and pull keys back out for other languages?
         return content_primary
