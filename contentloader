@@ -88,6 +88,7 @@ class ContentLoader(object):
         elif self.options.report_broken_docs:
             documents = self.get_documents()
             all_content = [c for c in map(self.extract_and_transform, documents) if c]
+            all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content, report=True)
 
         # Load content
@@ -109,6 +110,7 @@ class ContentLoader(object):
                 existing_content[content['slug']] = content
 
             all_content = list(existing_content.values())
+
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
             self.download_assets(all_content)
@@ -375,7 +377,7 @@ class ContentLoader(object):
         for module in content_primary:
             module.setdefault('translations', {})
             for lang in self.config['language-all']:
-                keys = [k for k in module if k.endswith('-'+lang)]
+                keys = [k for k in module if isinstance(k, str) and k.endswith('-'+lang)]
                 inline = {k[:-3]: module[k] for k in keys if module[k]}
                 if inline:
                     if lang == self.config['language-default']:
@@ -410,7 +412,7 @@ class ContentLoader(object):
                 <h1>{{ title }}</h1>
                 <p>
                     Modifications to this file will be discarded.<br>
-                    Please disregard missing keys in translated pieces for now.<br>
+                    Translated pieces are not currently represented in this report.<br>
                     <em>Updated: {{ timestamp }} UTC</em><br>
                 </p>
                 <hr>
