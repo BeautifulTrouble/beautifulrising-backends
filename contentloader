@@ -100,12 +100,13 @@ class ContentLoader(object):
             existing_content = {d.doc['slug']: d.doc for d in self.db.view('_all_docs', include_docs=True) 
                                 if 'document-id' in d.doc}
 
-            # Identify published documents by their filenames
+            # Identify published documents by their filenames and fetch new content
             published = re.compile(self.config['published-filename-regex']).search
             published_documents = (d for d in self.get_documents() if published(d.title))
+            new_content = filter(None, map(self.extract_and_transform, published_documents))
 
-            # Extract new content and merge it with the existing, preserving any translations
-            for content in filter(None, map(self.extract_and_transform, published_documents)):
+            # Merge new content with existing, preserving any translations
+            for content in new_content:
                 content['translations'] = existing_content.get(content['slug'], {}).get('translations', {})
                 existing_content[content['slug']] = content
 
@@ -368,6 +369,7 @@ class ContentLoader(object):
         for translation in content_translated:
             original = self.find_module(translation.get('original', ''), content_primary)
             if not original:
+                log("skip: {} can't find original".format(document.title))
                 continue
             translations = original.setdefault('translations', {})
             translations[translation['lang']] = translation
@@ -440,13 +442,17 @@ class ContentLoader(object):
         '''
         This modifies all_content and should be called before the final db store.
         '''
-        # TODO: reduce redundant checks, add image scaling, etc
+        # In case somebody uses this feature to write to a production server :(
+        clean_path = lambda p,base='assets': os.path.normpath(os.path.join(base,
+            p.replace('\0','').replace('..','').strip('/')))
+
+        # TODO: add image scaling, etc
         for asset_spec in self.config['assets']:
             asset_folder = self.root.folder(asset_spec['source'])
             if not asset_folder:
                 continue
             asset_key = asset_spec['key']
-            with script_subdirectory(asset_spec['destination']):
+            with script_subdirectory(clean_path(asset_spec['destination'])):
                 # Iterate first over drive files because it's slow
                 for asset in asset_folder.files:
                     asset_name = os.path.splitext(asset.title.lower())[0]
