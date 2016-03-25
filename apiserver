@@ -6,11 +6,11 @@ autovenv.run()
 import os
 import sys
 from subprocess import Popen
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 import couchdb
 from couchdb.http import ResourceNotFound
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, url_for
 from flask_restful import Resource, Api
 from werkzeug.exceptions import NotFound, Forbidden
 
@@ -180,6 +180,16 @@ class Config(Resource):
     def get(self):
         return {k:v for k,v in config.items() if k not in config['config-hidden-keys']}
 api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
+
+
+# Expose the endpoints
+class Endpoints(Resource):
+    def get(self):
+        return {rule.endpoint: {
+                'url': unquote(url_for(rule.endpoint, **{a: '[{}]'.format(a) for a in rule.arguments})),
+                'methods': list(rule.methods),
+            } for rule in app.url_map.iter_rules()}
+api.add_resource(Endpoints, '/'.format(**vars()))
 
 
 if __name__ == '__main__':
