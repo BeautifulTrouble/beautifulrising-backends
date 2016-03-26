@@ -168,42 +168,34 @@ class ContentLoader(object):
         # Cap couchdb revision limit since documents are so frequently updated
         requests.put(urljoin(DB_SERVER, DB_NAME+'/_revs_limit'), data='50').status_code
 
+        # Load configuration document and set defaults
         document = self.root.file(CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")
-
         self.config = c = archieml.loads(document.text)
 
         # Hiding configuration options from the API
         c.setdefault('config-hidden-keys', ['notification-token'])
-
         # Drive notifications
         c.setdefault('notification-url', '')
         c.setdefault('notification-token', '')
-
         # Language settings
         c.setdefault('language-default', 'en')
         c.setdefault('language-all', ['en'])
         c.setdefault('language-add', '')
         c.setdefault('language-remove', '')
-
-        # How to distinguish published content
+        # How we distinguish published content
         c.setdefault('published-filename-regex', r'(?i)\bdone$')
-
         # Renaming synonymous keys, including those with language-suffixes
         c.setdefault('synonyms', {})
-
         # Shuffling content together
         c.setdefault('plural-separator-regex', r'(?:\s*,|\s+and|\s+&)\s+')
         c.setdefault('plural-keys', {})
         c.setdefault('plural-keys-collate', {})
-
         # Relationships between content items
         c.setdefault('relationships', {})
-
         # Associate assets files with a key and download them
         c.setdefault('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
-
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -214,6 +206,7 @@ class ContentLoader(object):
 
         # Save the config before creating lots of temporary language-related data within it
         self.db_save(c, 'config:api')
+        log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
         # of synonyms, plural-keys, and plural-keys-collate (where each entry is a nested list).
@@ -223,8 +216,6 @@ class ContentLoader(object):
         add_language_suffixes(c['synonyms'])
         add_language_suffixes(c['plural-keys'])
         add_language_suffixes(c['plural-keys-collate'])
-
-        log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
 
 
     def watch(self):
