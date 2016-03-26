@@ -11,20 +11,25 @@ import re
 import sys
 from itertools import zip_longest
 from pprint import pprint
+from urllib.parse import urljoin
 
 import archieml
 import couchdb
 import driveclient
 import jinja2
 import langdetect
+import requests
 from fuzzywuzzy.process import extractOne as fuzzy
 
 from utils import *
 
 
 DB_NAME = 'toolbox'
+DB_SERVER = 'http://127.0.0.1:5984/'
+
 CONFIG_FILE_NAME = 'CONFIG'
 ROOT_FOLDER_NAME = 'BR CONTENT'
+
 DRIVE_CLIENT_NAME = 'beautiful-rising'
 SERVICE_ACCOUNT_JSON_FILENAME = 'beautiful-rising-eae5ff71ae04.json'
 
@@ -54,7 +59,7 @@ class ContentLoader(object):
         self.options,_ = arg_parser.parse_known_args()
 
         # Connect to couchdb
-        self.couch = couchdb.Server()
+        self.couch = couchdb.Server(DB_SERVER)
         self.db = self.couch[DB_NAME] if DB_NAME in self.couch else self.couch.create(DB_NAME)
 
         # Connect to Google Drive and get the root folder
@@ -160,6 +165,9 @@ class ContentLoader(object):
         '''
         Fetch, parse, set defaults, and store the config
         '''
+        # Cap couchdb revision limit since documents are so frequently updated
+        requests.put(urljoin(DB_SERVER, DB_NAME+'/_revs_limit'), data='50').status_code
+
         document = self.root.file(CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")

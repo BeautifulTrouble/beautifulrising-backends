@@ -8,3 +8,4 @@ langdetect
 fuzzywuzzy
 python-Levenshtein
 python-magic
+requests
