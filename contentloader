@@ -105,19 +105,19 @@ class ContentLoader(object):
             published_documents = (d for d in self.get_documents() if published(d.title))
             new_content = filter(None, map(self.extract_and_transform, published_documents))
 
-            # Merge new content with existing, preserving any translations
+            # Merge new content with existing, preserving revision number and translations
             for content in new_content:
-                content['translations'] = existing_content.get(content['slug'], {}).get('translations', {})
+                existing = existing_content.get(content['slug'])
+                if existing:
+                    content['_rev'] = existing['_rev']
+                    content['translations'] = existing.get('translations', {})
                 existing_content[content['slug']] = content
 
             all_content = list(existing_content.values())
-
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
-            self.download_assets(all_content)
-
-            for content in all_content:
-                self.db_save(content)
+            all_content = self.download_assets(all_content)
+            self.db_save(all_content)
 
 
     def type_info(self, content):
@@ -139,17 +139,21 @@ class ContentLoader(object):
             return match[0]
 
 
-    def db_save(self, doc, id=None):
+    def db_save(self, doc_or_docs, id=None):
         '''
-        Write doc to couchdb, adding a revision if the document exists
-        To clarify, this is a couchdb doc and not a google doc.
+        Write one or many dicts (docs) to couchdb
         '''
-        doc = {k:v for k,v in doc.items() if not k.startswith('_')}
-        doc.update(_id=id or '{type}:{slug}'.format(**doc))
-        try:
-            doc.update(_rev=self.db[doc['_id']]['_rev'])
-        except couchdb.http.ResourceNotFound: pass
-        self.db.save(doc)
+        # Handle one or many docs
+        docs,id = ([doc_or_docs], id) if isinstance(doc_or_docs, dict) else (doc_or_docs, None)
+        # Remove couch-disallowed keys and add _id where needed
+        docs = [{k:v for k,v in d.items() if k in ('_id', '_rev') or not k.startswith('_')} for d in docs]
+        [d.update(_id=id or '{type}:{slug}'.format(**d)) for d in docs if '_id' not in d]
+        # Simple conflict resolution (WARNING: this won't work with replication!)
+        for success,id,rev_or_exc in self.db.update(docs):
+            if isinstance(rev_or_exc, couchdb.http.ResourceConflict):
+                retry = [d for d in docs if d['_id'] == id][0]
+                retry.update(_rev=self.db[id]['_rev'])
+                self.db.save(retry)
 
 
     def configure(self):
@@ -369,7 +373,7 @@ class ContentLoader(object):
         for translation in content_translated:
             original = self.find_module(translation.get('original', ''), content_primary)
             if not original:
-                log("skip: {} can't find original".format(document.title))
+                log("skip: {} can't find original {}".format(translation.get('title'), translation.get('original')))
                 continue
             translations = original.setdefault('translations', {})
             translations[translation['lang']] = translation
@@ -465,8 +469,8 @@ class ContentLoader(object):
                             filename = slugify(name) + ext
                             content[asset_key] = filename
                             # Download the actual file
-                            asset.save_as(filename)
-                            log('download: asset "{}"'.format(filename))
+                            if asset.save_as(filename):
+                                log('download: asset "{}"'.format(filename))
         return all_content
 
 
