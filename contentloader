@@ -341,7 +341,8 @@ class ContentLoader(object):
         '''
         if 'lang' not in content:
             language_suffixes = ['-'+lang for lang in self.config['language-all']]
-            text = [v for k,v in content.items() if isinstance(v, str) and k[-3:] not in language_suffixes]
+            text = [v for k,v in content.items() if isinstance(v, str)
+                    and (k[-3:] not in language_suffixes) and (not k.startswith('document-'))]
             corpus = '\n'.join(sorted(text, key=len, reverse=True))
             try:
                 lang = langdetect.detect(corpus)
