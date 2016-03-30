@@ -132,7 +132,7 @@ class ContentLoader(object):
         return next((T for T in self.config['types'] if T['name'] in content), {})
 
 
-    def find_module(self, module_or_name, module_list, thresh=0.5):
+    def find_module(self, module_or_name, module_list, thresh=50):
         '''
         Use fuzzy matching to find a module from a list
         '''
