@@ -282,7 +282,8 @@ class ContentLoader(object):
         text = text.replace('\r', '')
         # Strip google's comment annotations if at all possible
         text = re.sub(r'(?:\[([a-z])\1?\])+$|^\[([a-z])\2?\].+$', '', text, flags=re.M) 
-        content = archieml.loads(text)
+        # Undo some mostly unintentional auto-capitalization by google docs
+        content = {k.lower(): v for k,v in archieml.loads(text).items()}
 
         # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
