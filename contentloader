@@ -119,6 +119,7 @@ class ContentLoader(object):
                 existing_content[content['slug']] = content
 
             all_content = list(existing_content.values())
+            all_content = self.fix_relationships(all_content)
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
             all_content = self.download_assets(all_content)
@@ -132,15 +133,15 @@ class ContentLoader(object):
         return next((T for T in self.config['types'] if T['name'] in content), {})
 
 
-    def find_module(self, module_or_name, module_list, thresh=50):
+    def find_content(self, item_or_name, item_list, thresh=50):
         '''
-        Use fuzzy matching to find a module from a list
+        Use fuzzy matching to find a content item from a list
         '''
-        module_name = module_or_name
-        if not isinstance(module_or_name, str):
-            module_name = module_or_name['title']
-        match = fuzzy(module_name, module_list, processor=lambda m: m['title'])
-        if match and match[1] > thresh:
+        item_name = item_or_name
+        if not isinstance(item_or_name, str):
+            item_name = item_or_name['title']
+        match = fuzzy(item_name, item_list, processor=lambda m: m['title'])
+        if match and match[1] >= thresh:
             return match[0]
 
 
@@ -371,7 +372,7 @@ class ContentLoader(object):
 
         # Add translated content to a translations dict in each original language piece
         for translation in content_translated:
-            original = self.find_module(translation.get('original', ''), content_primary)
+            original = self.find_content(translation.get('original', ''), content_primary)
             if not original:
                 log("skip: {} can't find original {}".format(translation.get('title'), translation.get('original')))
                 continue
@@ -380,22 +381,40 @@ class ContentLoader(object):
             log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], original['title']))
 
         # Look through primary language documents and move translated keys into place
-        for module in content_primary:
-            module.setdefault('translations', {})
+        for content in content_primary:
+            content.setdefault('translations', {})
             for lang in self.config['language-all']:
-                keys = [k for k in module if isinstance(k, str) and k.endswith('-'+lang)]
-                inline = {k[:-3]: module[k] for k in keys if module[k]}
+                keys = [k for k in content if isinstance(k, str) and k.endswith('-'+lang)]
+                inline = {k[:-3]: content[k] for k in keys if content[k]}
                 if inline:
                     if lang == self.config['language-default']:
-                        module.update(inline)
+                        content.update(inline)
                     else:
-                        lang_dict = module['translations'].setdefault(lang, {})
+                        lang_dict = content['translations'].setdefault(lang, {})
                         lang_dict.update(inline)
-                    [module.pop(k) for k in keys]
+                    [content.pop(k) for k in keys]
                     print(lang, '-=>', inline) #TODO: remove
 
         #TODO: descend into each translation and pull keys back out for other languages?
         return content_primary
+
+
+    def fix_relationships(self, all_content):
+        '''
+        Replace relationships based on titles with fuzzy-matched slugs
+        '''
+        # Create a mapping between keys and possible content items
+        typed = {}
+        for content in all_content:
+            typed.setdefault(content['type'], []).append(content)
+        keys_and_choices = {k: typed.get(v, []) for k,v in self.config['relationships'].items()}
+        # Fuzzy match and slugify related content items
+        for content in all_content:
+            for key,choices in keys_and_choices.items():
+                if key in content:
+                    content[key] = [m for m in ((self.find_content(t, choices, 90) or {}).get('slug')
+                                                for t in content.get(key, [])) if m]
+        return all_content
 
 
     def filter_broken_content(self, all_content, report=False):
