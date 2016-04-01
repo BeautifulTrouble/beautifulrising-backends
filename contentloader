@@ -126,6 +126,18 @@ class ContentLoader(object):
             self.db_save(all_content)
 
 
+    def parse_markup(self, text):
+        '''
+        Abstract all markup preprocessing and parsing to this function
+        '''
+        # What is this, macrosoft wandows?
+        text = text.replace('\r', '')
+        # Strip google's comment annotations if at all possible
+        text = re.sub(r'(?:\[([a-z])\1?\])+$|^\[([a-z])\2?\].+$', '', text, flags=re.M)
+        # Undo some of the auto-capitalization google docs inflicts
+        return {k.lower(): v for k,v in archieml.loads(text).items()}
+
+
     def type_info(self, content):
         '''
         Return the type data structure for the content item
@@ -173,7 +185,7 @@ class ContentLoader(object):
         document = self.root.file(CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")
-        self.config = c = archieml.loads(document.text)
+        self.config = c = self.parse_markup(document.text)
 
         # Hiding configuration options from the API
         c.setdefault('config-hidden-keys', ['notification-token'])
@@ -278,12 +290,7 @@ class ContentLoader(object):
         '''
         Process a document and return a content item.
         '''
-        text = document.text
-        text = text.replace('\r', '')
-        # Strip google's comment annotations if at all possible
-        text = re.sub(r'(?:\[([a-z])\1?\])+$|^\[([a-z])\2?\].+$', '', text, flags=re.M) 
-        # Undo some mostly unintentional auto-capitalization by google docs
-        content = {k.lower(): v for k,v in archieml.loads(text).items()}
+        content = self.parse_markup(document.text)
 
         # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
