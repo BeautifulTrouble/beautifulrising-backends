@@ -344,21 +344,22 @@ class ContentLoader(object):
         return content
 
 
-    def add_language_tag(self, content):
+    def add_language_tags(self, all_content):
         '''
-        Add language tag to a content item
+        Add language tags to content items
         '''
-        if 'lang' not in content:
-            language_suffixes = ['-'+lang for lang in self.config['language-all']]
-            text = [v for k,v in content.items() if isinstance(v, str)
-                    and (k[-3:] not in language_suffixes) and (not k.startswith('document-'))]
-            corpus = '\n'.join(sorted(text, key=len, reverse=True))
-            try:
-                lang = langdetect.detect(corpus)
-                assert lang in self.config['language-all']
-            except:
-                lang = self.config['language-default']
-            content['lang'] = lang
+        language_suffixes = ['-'+lang for lang in self.config['language-all']]
+        for content in all_content:
+            if 'lang' not in content:
+                corpus = '\n'.join(v for k,v in content.items() if isinstance(v, str)
+                                   and (k[-3:] not in language_suffixes)
+                                   and (not k.startswith('document-')))
+                try:
+                    lang = langdetect.detect(corpus)
+                    assert lang in self.config['language-all']
+                except:
+                    lang = self.config['language-default']
+                content['lang'] = lang
 
 
     def merge_translations(self, all_content):
@@ -371,8 +372,8 @@ class ContentLoader(object):
         content_translated = []
 
         # Sort content by language
+        self.add_language_tags(all_content)
         for content in all_content:
-            self.add_language_tag(content)
             if content['lang'] == self.config['language-default']:
                 content_primary.append(content)
             else:
