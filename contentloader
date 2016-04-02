@@ -155,6 +155,7 @@ class ContentLoader(object):
         match = fuzzy(item_name, item_list, processor=lambda m: m['title'])
         if match and match[1] >= thresh:
             return match[0]
+        return {}
 
 
     def db_save(self, doc_or_docs, id=None):
@@ -404,7 +405,7 @@ class ContentLoader(object):
                     [content.pop(k) for k in keys]
                     print(lang, '-=>', inline) #TODO: remove
 
-        #TODO: descend into each translation and pull keys back out for other languages?
+        # All content is now in this merged list
         return content_primary
 
 
@@ -416,13 +417,25 @@ class ContentLoader(object):
         typed = {}
         for content in all_content:
             typed.setdefault(content['type'], []).append(content)
-        keys_and_choices = {k: typed.get(v, []) for k,v in self.config['relationships'].items()}
+
+        relationships = self.config['relationships']
+        keys_and_choices = {k: typed.get(v, []) for k,v in relationships.items()}
+        types_and_keys = {v: k for k,v in relationships.items()}
+
         # Fuzzy match and slugify related content items
         for content in all_content:
+            this_slug = {content['slug']}
+            key_referring_to_this_type = types_and_keys.get(content['type'], '')
             for key,choices in keys_and_choices.items():
                 if key in content:
-                    content[key] = [m for m in ((self.find_content(t, choices, 90) or {}).get('slug')
-                                                for t in content.get(key, [])) if m]
+                    found_content = {c['slug']: c for c in (self.find_content(t, choices, 90)
+                                                            for t in content[key]) if c}
+                    content[key] = sorted(found_content)
+                    # Ensure the relationships are bi-directional
+                    for other in found_content.values():
+                        other_list = other.get(key_referring_to_this_type)
+                        if other_list:
+                            other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
         return all_content
 
 
@@ -447,6 +460,8 @@ class ContentLoader(object):
                 <p>
                     Modifications to this file will be discarded.<br>
                     Translated pieces are not currently represented in this report.<br>
+                    Be aware that a field flagged as missing may indicate that the<br>
+                    related document to which it refers is missing or not "DONE."<br>
                     <em>Updated: {{ timestamp }} UTC</em><br>
                 </p>
                 <hr>
