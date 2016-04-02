@@ -287,6 +287,17 @@ class ContentLoader(object):
         return documents
 
 
+    def simple_timestamp(self, rfc3339):
+        '''
+        Make a simple javascript-style timestamp from an RFC3339 date
+        '''
+        try:
+            stamp = datetime.datetime.strptime(rfc3339, '%Y-%m-%dT%H:%M:%S.%fZ')
+        except:
+            stamp = datetime.datetime.now()
+        return int(stamp.timestamp() * 1000)
+
+
     def extract_and_transform(self, document):
         '''
         Process a document and return a content item.
@@ -310,6 +321,7 @@ class ContentLoader(object):
 
         # Add a few useful bits
         content['slug'] = slugify(content.get('title', ''), allow=':')
+        content['timestamp'] = self.simple_timestamp(document.modifiedDate)
         content['document-id'] = document.id
         content['document-link'] = document.alternateLink
         content['document-title'] = document.title
