@@ -3,6 +3,7 @@
 import autovenv
 autovenv.run()
 
+import json
 import os
 import sys
 from subprocess import Popen
@@ -135,16 +136,17 @@ def filter_by_language(resources, args):
 
     output = []
     for resource in resources:
-        translations = resource.pop('translations')
-        # In translated languages merge data using language-add and language-remove config items
-        if lang in translations:
-            preserved = {k:v for k,v in resource.items() if k in language_add}
-            resource.update({k:v for k,v in translations[lang].items() if k not in language_remove})
-            for k,item_in_default_language in preserved.items():
-                if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
-                    resource[k] += item_in_default_language
-            resource['lang'] = lang
-        # In the default language simply removing the translations is enough
+        if 'translations' in resource:
+            # In the default language simply removing the translations is enough
+            translations = resource.pop('translations')
+            # In translated languages merge data using language-add and language-remove config items
+            if lang in translations:
+                preserved = {k:v for k,v in resource.items() if k in language_add}
+                resource.update({k:v for k,v in translations[lang].items() if k not in language_remove})
+                for k,item_in_default_language in preserved.items():
+                    if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
+                        resource[k] += item_in_default_language
+                resource['lang'] = lang
         output.append(resource)
     return output
 
@@ -173,6 +175,33 @@ for singular_name,plural_name in types.items():
             except ResourceNotFound: raise NotFound
             return filter_by_language([resource], args)[0]
     api.add_resource(One, '/{PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
+
+
+# Get the grouped types and create endpoints
+groups = {k.split('-',1)[-1]:[slugify(d['one']) for d in v] for k,v in config.items() if k.startswith('types-')}
+for group,types in groups.items():
+    class Group(Resource):
+        types = types
+        query = "function(doc){if(%s.indexOf(doc.type)!=-1){emit(doc.slug,doc)}}" % json.dumps(types)
+        def get(self):
+            args = flatten_args(request.args)
+            try:
+                resources = [doc['value'] for doc in db.query(self.query)]
+            except (KeyError, ResourceNotFound): raise NotFound
+            return filter_by_language(resources, args)
+    api.add_resource(Group, '/{PREFIX}/{group}'.format(**vars()), endpoint=group)
+
+
+# Just emit all the documents
+class All(Resource):
+    query = "function(doc){emit(doc.slug,doc)}"
+    def get(self):
+        args = flatten_args(request.args)
+        try:
+            resources = [doc['value'] for doc in db.query(self.query)]
+        except (KeyError, ResourceNotFound): raise NotFound
+        return filter_by_language(resources, args)
+api.add_resource(All, '/{PREFIX}/all'.format(**vars()), endpoint='all')
 
 
 # Expose the config for front-ends
