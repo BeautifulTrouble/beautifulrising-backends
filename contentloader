@@ -158,15 +158,15 @@ class ContentLoader(object):
         return {}
 
 
-    def db_save(self, doc_or_docs, id=None):
+    def db_save(self, doc_or_docs):
         '''
         Write one or many dicts (docs) to couchdb
         '''
         # Handle one or many docs
-        docs,id = ([doc_or_docs], id) if isinstance(doc_or_docs, dict) else (doc_or_docs, None)
+        docs = [doc_or_docs] if isinstance(doc_or_docs, dict) else doc_or_docs
         # Remove couch-disallowed keys and add _id where needed
         docs = [{k:v for k,v in d.items() if k in ('_id', '_rev') or not k.startswith('_')} for d in docs]
-        [d.update(_id=id or '{type}:{slug}'.format(**d)) for d in docs if '_id' not in d]
+        [d.update(_id='{type}:{slug}'.format(**d)) for d in docs if '_id' not in d]
         # Simple conflict resolution (WARNING: this won't work with replication!)
         for success,id,rev_or_exc in self.db.update(docs):
             if isinstance(rev_or_exc, couchdb.http.ResourceConflict):
@@ -219,7 +219,8 @@ class ContentLoader(object):
                 c['types'] += value
 
         # Save the config before creating lots of temporary language-related data within it
-        self.db_save(c, 'config:api')
+        c.update(type='config', slug='api')
+        self.db_save(c)
         log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
