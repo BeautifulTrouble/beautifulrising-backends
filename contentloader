@@ -135,7 +135,7 @@ class ContentLoader(object):
         # Strip google's comment annotations if at all possible
         text = re.sub(r'(?:\[([a-z])\1?\])+$|^\[([a-z])\2?\].+$', '', text, flags=re.M)
         # Undo some of the auto-capitalization google docs inflicts
-        return {k.lower(): v for k,v in archieml.loads(text).items()}
+        return {k.lower(): v for k,v in archieml.loads(text).items() if v}
 
 
     def type_info(self, content):
