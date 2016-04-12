@@ -13,6 +13,7 @@ import couchdb
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, url_for
 from flask_restful import Resource, Api
+from flask.ext.compress import Compress
 from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
@@ -25,6 +26,7 @@ GOOGLE_VERIFICATION = 'google5844dd3c739be066.html'
 
 app = Flask(__name__)
 api = Api(app)
+Compress(app)
 
 couch = couchdb.Server()
 db = couch['toolbox']
