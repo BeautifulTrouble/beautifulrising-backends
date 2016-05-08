@@ -11,6 +11,7 @@ import re
 import sys
 from itertools import zip_longest
 from pprint import pprint
+from string import capwords
 from urllib.parse import urljoin
 
 import archieml
@@ -516,7 +517,7 @@ class ContentLoader(object):
             for field in self.config['normalize']:
                 obj = content.get(field)
                 if obj:
-                    content[field] = [w.title() for w in obj] if isinstance(obj, list) else obj.title()
+                    content[field] = [capwords(w) for w in obj] if isinstance(obj, list) else capwords(obj)
         return all_content
 
 
