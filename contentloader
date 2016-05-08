@@ -18,6 +18,7 @@ import couchdb
 import driveclient
 import jinja2
 import langdetect
+import markdown
 import requests
 from fuzzywuzzy.process import extractOne as fuzzy
 
@@ -122,6 +123,7 @@ class ContentLoader(object):
             all_content = self.fix_relationships(all_content)
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
+            all_content = self.postprocess(all_content)
             all_content = self.download_assets(all_content)
             self.db_save(all_content)
 
@@ -208,6 +210,9 @@ class ContentLoader(object):
         c.setdefault('plural-keys-collate', {})
         # Relationships between content items
         c.setdefault('relationships', {})
+        # Fields which should be parsed with markdown and "normalization"
+        c.setdefault('normalize', [])
+        c.setdefault('markdown', [])
         # Associate assets files with a key and download them
         c.setdefault('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
         # Content type information
@@ -496,6 +501,23 @@ class ContentLoader(object):
             self.root.write_html(title, html)
 
         return good_content
+
+
+    def postprocess(self, all_content):
+        '''
+        Apply markdown and normalization
+        '''
+        md = markdown.Markdown(extensions=['markdown.extensions.footnotes'])
+        for content in all_content:
+            for field in self.config['markdown']:
+                obj = content.get(field)
+                if obj:
+                    content[field] = [md.convert(t) for t in obj] if isinstance(obj, list) else md.convert(obj)
+            for field in self.config['normalize']:
+                obj = content.get(field)
+                if obj:
+                    content[field] = [w.title() for w in obj] if isinstance(obj, list) else obj.title()
+        return all_content
 
 
     def download_assets(self, all_content):

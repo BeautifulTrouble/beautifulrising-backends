@@ -10,3 +10,4 @@ fuzzywuzzy
 python-Levenshtein
 python-magic
 requests
+markdown
