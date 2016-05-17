@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#encoding: utf-8
 
 # Auto-install and activate a virtualenv if possible
 import autovenv
