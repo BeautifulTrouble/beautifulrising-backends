@@ -93,7 +93,7 @@ def log(*s, fatal=False, **kw):
     '''
     s = ' '.join(str(i) for i in s)
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(script_dir, 'log.txt'), 'a') as file:
+    with open(os.path.join(script_dir, 'log.txt'), 'a', encoding="utf-8") as file:
         file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
         print(s, **kw)
     if fatal:
