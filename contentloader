@@ -105,7 +105,7 @@ class ContentLoader(object):
 
             # Fetch all the existing content from the db
             existing_content = {d.doc['slug']: d.doc for d in self.db.view('_all_docs', include_docs=True) 
-                                if 'document-id' in d.doc}
+                                if 'document_id' in d.doc}
 
             # Identify published documents by their filenames and fetch new content
             published = re.compile(self.config['published-filename-regex']).search
@@ -329,9 +329,9 @@ class ContentLoader(object):
         # Add a few useful bits
         content['slug'] = slugify(content.get('title', ''), allow=':')
         content['timestamp'] = self.simple_timestamp(document.modifiedDate)
-        content['document-id'] = document.id
-        content['document-link'] = document.alternateLink
-        content['document-title'] = document.title
+        content['document_id'] = document.id
+        content['document_link'] = document.alternateLink
+        content['document_title'] = document.title
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():
@@ -401,7 +401,7 @@ class ContentLoader(object):
 
         # Add translated content to a translations dict in each original language piece
         for translation in content_translated:
-            original = self.find_content(translation.get('original', ''), content_primary)
+            original = self.find_content(translation.get('original', ''), content_primary, thresh=75)
             if not original:
                 log("skip: {} can't find original {}".format(translation.get('title'), translation.get('original')))
                 continue
@@ -487,7 +487,7 @@ class ContentLoader(object):
                 {% for content in all_content %}
                 {% if 'missing-items' in content %}
                 <p>
-                    <a href="{{ content['document-link'] }}">{{ content['document-title'] }}</a><br>
+                    <a href="{{ content.document_link }}">{{ content.document_title }}</a><br>
                     {% if content.authors %}
                     {% for author in content.authors %}
                     <strong>Author:</strong> {{ author }}<br>
@@ -508,11 +508,11 @@ class ContentLoader(object):
         '''
         Apply markdown and normalization
         '''
-        md = markdown.Markdown(extensions=['markdown.extensions.footnotes'])
         for content in all_content:
             for field in self.config['markdown']:
                 obj = content.get(field)
                 if obj:
+                    md = markdown.Markdown(extensions=['markdown.extensions.footnotes'])
                     content[field] = [md.convert(t) for t in obj] if isinstance(obj, list) else md.convert(obj)
             for field in self.config['normalize']:
                 obj = content.get(field)
