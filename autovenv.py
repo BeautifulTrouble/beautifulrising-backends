@@ -14,7 +14,6 @@ __version__ = '0.2'
 
 
 import sys
-sys.setdefaultencoding('utf-8')
 
 
 def log(marker, *strings, **kw):
