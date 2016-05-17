@@ -14,6 +14,7 @@ __version__ = '0.2'
 
 
 import sys
+sys.setdefaultencoding('utf-8')
 
 
 def log(marker, *strings, **kw):
@@ -67,7 +68,7 @@ else:
             "\n      --no-autovenv      Don't auto activate or install a virtualenv",
             "\n      --remove-venv      Remove old virtualenv so a fresh one can be installed",
             "\n")
-        log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'*')
+        log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'™')
 
         # Remove the bad virtualenv
         if flags['--remove-venv']:
