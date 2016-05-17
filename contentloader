@@ -221,7 +221,7 @@ class ContentLoader(object):
         c.setdefault('markdown', [])
         # Download top-level assets from this top-level folder to this (relative) local path
         c.setdefault('asset-sources', ['ASSETS'])
-        c.setdefault('asset-destination', 'assets/content')
+        c.setdefault('asset-path', '/assets/content')
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -534,7 +534,7 @@ class ContentLoader(object):
         # In case somebody uses this feature to write to a production server :(
         clean_path = lambda p: os.path.normpath(p.replace('\0','').replace('..','').strip('/'))
 
-        destination = clean_path(self.config['asset-destination'])
+        destination = clean_path(self.config['asset-path'])
         with script_subdirectory(destination):
             for source in self.config['asset-sources']:
                 folder = self.root.folder(source)
