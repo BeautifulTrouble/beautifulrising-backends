@@ -67,7 +67,7 @@ else:
             "\n      --no-autovenv      Don't auto activate or install a virtualenv",
             "\n      --remove-venv      Remove old virtualenv so a fresh one can be installed",
             "\n")
-        log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'™')
+        log('+', 'Running', calling_script, '\n   ', len('Running '+calling_script)*'-')
 
         # Remove the bad virtualenv
         if flags['--remove-venv']:
