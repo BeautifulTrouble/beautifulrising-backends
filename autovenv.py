@@ -1,3 +1,5 @@
+#encoding: utf-8
+
 """ 
 This module makes this distribution of programs easier by automatically
 creating or activating a virtualenv as needed when a program starts.
