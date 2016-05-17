@@ -113,10 +113,13 @@ class ContentLoader(object):
             published_documents = (d for d in self.get_documents() if published(d.title))
             new_content = filter(None, map(self.extract_and_transform, published_documents))
 
+            # TODO: detect duplicate names
+
             # Merge new content with existing, preserving revision number and translations
             for content in new_content:
                 existing = existing_content.get(content['slug'])
-                if existing:
+                #TODO: this is a bug and should be fixed (duplicate titles -> duplicate slugs -> duplicate ids -> incorrect reasoning about what is or isn't an existing piece)
+                if existing and '_rev' in existing: 
                     content['_rev'] = existing['_rev']
                     content['translations'] = existing.get('translations', {})
                 existing_content[content['slug']] = content
