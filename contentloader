@@ -169,6 +169,7 @@ class ContentLoader(object):
         '''
         Write one or many dicts (docs) to couchdb
         '''
+        if not doc_or_docs: return
         # Handle one or many docs
         docs = [doc_or_docs] if isinstance(doc_or_docs, dict) else doc_or_docs
         # Remove couch-disallowed keys and add _id where needed
@@ -218,8 +219,9 @@ class ContentLoader(object):
         # Fields which should be parsed with markdown and "normalization"
         c.setdefault('normalize', [])
         c.setdefault('markdown', [])
-        # Associate assets files with a key and download them
-        c.setdefault('assets', [{'key': 'image', 'source': 'images', 'destination': 'images'}])
+        # Download top-level assets from this top-level folder to this (relative) local path
+        c.setdefault('asset-sources', ['ASSETS'])
+        c.setdefault('asset-destination', 'assets/content')
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -344,7 +346,7 @@ class ContentLoader(object):
                 content[plural_key] = [single]
                 if plural_key != singular_key:
                     del content[singular_key]
-            if plural:
+            if plural and not isinstance(plural, list):
                 multiline = re.split(r'\s*\n\s*\n\s*', plural)
                 content[plural_key] = (multiline if len(multiline) > 1 else 
                                        re.split(self.config['plural-separator-regex'], plural))
@@ -527,33 +529,18 @@ class ContentLoader(object):
 
     def download_assets(self, all_content):
         '''
-        This modifies all_content and should be called before the final db store.
+        Download all top-level assets from top-level folders specified in config['asset-sources']
         '''
         # In case somebody uses this feature to write to a production server :(
-        clean_path = lambda p,base='assets': os.path.normpath(os.path.join(base,
-            p.replace('\0','').replace('..','').strip('/')))
+        clean_path = lambda p: os.path.normpath(p.replace('\0','').replace('..','').strip('/'))
 
-        # TODO: add image scaling, etc
-        for asset_spec in self.config['assets']:
-            asset_folder = self.root.folder(asset_spec['source'])
-            if not asset_folder:
-                continue
-            asset_key = asset_spec['key']
-            with script_subdirectory(clean_path(asset_spec['destination'])):
-                # Iterate first over drive files because it's slow
-                for asset in asset_folder.files:
-                    asset_name = os.path.splitext(asset.title.lower())[0]
-                    # Then find content items which require the asset
-                    for content in all_content:
-                        desired_asset = os.path.splitext(content.get(asset_key, '').lower())[0]
-                        if (desired_asset == asset_name):
-                            # Slugify and update the filename
-                            name, ext = os.path.splitext(asset.title)
-                            filename = slugify(name) + ext
-                            content[asset_key] = filename
-                            # Download the actual file
-                            if asset.save_as(filename):
-                                log('download: asset "{}"'.format(filename))
+        destination = clean_path(self.config['asset-destination'])
+        with script_subdirectory(destination):
+            for source in self.config['asset-sources']:
+                folder = self.root.folder(source)
+                for file in folder.files:
+                    if file.save_as(file.title):
+                        log('download: asset "{}"'.format(file.title))
         return all_content
 
 
