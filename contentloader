@@ -20,7 +20,6 @@ import couchdb
 import driveclient
 import jinja2
 import langdetect
-import markdown
 import requests
 from fuzzywuzzy.process import extractOne as fuzzy
 
@@ -128,7 +127,6 @@ class ContentLoader(object):
             all_content = self.fix_relationships(all_content)
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
-            all_content = self.postprocess(all_content)
             all_content = self.download_assets(all_content)
             self.db_save(all_content)
 
@@ -221,7 +219,7 @@ class ContentLoader(object):
         c.setdefault('markdown', [])
         # Download top-level assets from this top-level folder to this (relative) local path
         c.setdefault('asset-sources', ['ASSETS'])
-        c.setdefault('asset-destination', 'assets/content')
+        c.setdefault('asset-path', '/assets/content')
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -365,6 +363,12 @@ class ContentLoader(object):
                 content.pop(old_key, None)
             if collated_dicts:
                 content[output] = collated_dicts
+
+        # Apply the "normalization" filter which is curently just capitalized words
+        for field in self.config['normalize']:
+            obj = content.get(field)
+            if obj:
+                content[field] = [capwords(w) for w in obj] if isinstance(obj, list) else capwords(obj)
         
         log("extract: {} ({}: {})".format(document.id, type, content['title']))
         return content
@@ -510,23 +514,6 @@ class ContentLoader(object):
         return good_content
 
 
-    def postprocess(self, all_content):
-        '''
-        Apply markdown and normalization
-        '''
-        for content in all_content:
-            for field in self.config['markdown']:
-                obj = content.get(field)
-                if obj:
-                    md = markdown.Markdown(extensions=['markdown.extensions.footnotes'])
-                    content[field] = [md.convert(t) for t in obj] if isinstance(obj, list) else md.convert(obj)
-            for field in self.config['normalize']:
-                obj = content.get(field)
-                if obj:
-                    content[field] = [capwords(w) for w in obj] if isinstance(obj, list) else capwords(obj)
-        return all_content
-
-
     def download_assets(self, all_content):
         '''
         Download all top-level assets from top-level folders specified in config['asset-sources']
@@ -534,7 +521,7 @@ class ContentLoader(object):
         # In case somebody uses this feature to write to a production server :(
         clean_path = lambda p: os.path.normpath(p.replace('\0','').replace('..','').strip('/'))
 
-        destination = clean_path(self.config['asset-destination'])
+        destination = clean_path(self.config['asset-path'])
         with script_subdirectory(destination):
             for source in self.config['asset-sources']:
                 folder = self.root.folder(source)
