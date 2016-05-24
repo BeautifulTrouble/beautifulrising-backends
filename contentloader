@@ -325,7 +325,7 @@ class ContentLoader(object):
         # Determine the type
         type = self.type_info(content).get('name', '')
         content['type'] = type
-        content['title'] = title = content.get(type, '')
+        content['title'] = title = content.get(type)
         if not isinstance(title, str): 
             log("skip: {} bad type information".format(document.id))
             return
