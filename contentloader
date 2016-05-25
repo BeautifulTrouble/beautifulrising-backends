@@ -217,6 +217,8 @@ class ContentLoader(object):
         # Fields which should be parsed with markdown and "normalization"
         c.setdefault('normalize', [])
         c.setdefault('markdown', [])
+        # Fields which should be indexed by client search engines
+        c.setdefault('search', [])
         # Download top-level assets from this top-level folder to this (relative) local path
         c.setdefault('asset-sources', ['ASSETS'])
         c.setdefault('asset-path', '/assets/content')
