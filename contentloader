@@ -150,7 +150,7 @@ class ContentLoader(object):
             # Clean up learn-more section
             learn = content.get('learn-more')
             if learn:
-                clean = [L for L in learn if all(L) and L.get('title') != 'abc' and L.get('link') != 'url']
+                clean = [L for L in learn if all(L.values()) and L.get('title') != 'abc' and L.get('link') != 'url']
                 content['learn-more'] = clean
         return all_content
 
