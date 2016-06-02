@@ -481,15 +481,15 @@ class ContentLoader(object):
             else:
                 content_translated.append(content)
 
-        # Add translated content to a translations dict in each original language piece
+        # Add translated content to a translations dict in each default language piece
         for translation in content_translated:
-            original = self.find_content(translation.get('original', ''), content_primary, thresh=75)
-            if not original:
-                log("skip: {} can't find original {}".format(translation.get('title'), translation.get('original')))
+            default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=75)
+            if not default:
+                log("skip: {} can't find default language version {}".format(translation.get('title'), translation.get('default-language-content')))
                 continue
-            translations = original.setdefault('translations', {})
+            translations = default.setdefault('translations', {})
             translations[translation['lang']] = translation
-            log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], original['title']))
+            log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], default['title']))
 
         # Look through primary language documents and move translated keys into place
         for content in content_primary:
