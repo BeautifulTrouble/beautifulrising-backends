@@ -201,14 +201,9 @@ class ContentLoader(object):
         '''
         # What is this, macrosoft wandows?
         text = text.replace('\r', '')
-        # Strip google's [a][b][c] comment annotations if at all possible
-        regex = ''
-        for c in reversed('abcdefghijklmnopqrstuvwxyz'):
-            regex = r'(\[{}\]{})?'.format(c, regex)
-        regex = regex[1:-2]
-        text = re.sub(regex, '', text, flags=re.M)
+        # Obliterate ALL of google's [a][b][c] comment annotations!
         text = re.sub(r'^\[[a-z]\].+$', '', text, flags=re.M)
-
+        text = re.sub(r'\[[a-z]\]', '', text)
         # Undo some of the auto-capitalization google docs inflicts
         return {k.lower(): v for k,v in archieml.loads(text).items() if v}
 
