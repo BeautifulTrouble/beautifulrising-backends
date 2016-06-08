@@ -134,22 +134,23 @@ class ContentLoader(object):
             self.db_save(all_content)
 
 
-
     def custom_filters(self, all_content):
         '''
         Project-specific filtering 
         '''
+        matcher = re.compile(r'\[([^\]]*)\]\(((?!http)[^)]+)\)').search
+        xrefpat = this.config['xref-link-pattern']
+
         def patch_links(text):
-            matcher = re.compile(r'\[([^\]]*)\]\(((?!http)[^)]+)\)').search
             m, chunks = matcher(text), []
             while m:
                 link_text, module_name, _, end = *m.groups(), *m.span()
                 content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
-                        replacement = '[%s](%s)' % (link_text, content['slug'])
+                        replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
                     else:
-                        replacement = '(see: [%s: %s](%s))' % (content['type'].upper(), content['title'], content['slug'])
+                        replacement = '(see: [%s: %s]({}))'.format(xrefpat) % (content['type'].upper(), content['title'], content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 else:
                     chunks.append(text[:end])
@@ -267,6 +268,7 @@ class ContentLoader(object):
         # Fields which should be parsed with markdown and "normalization"
         c.setdefault('normalize', [])
         c.setdefault('markdown', [])
+        c.setdefault('xref-link-pattern', '/module/%s')
         # Fields which should be indexed by client search engines
         c.setdefault('search', [])
         # Download top-level assets from this top-level folder to this (relative) local path
