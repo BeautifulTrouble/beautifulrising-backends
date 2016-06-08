@@ -139,7 +139,7 @@ class ContentLoader(object):
         Project-specific filtering 
         '''
         matcher = re.compile(r'\[([^\]]*)\]\(((?!http)[^)]+)\)').search
-        xrefpat = this.config['xref-link-pattern']
+        xrefpat = self.config['xref-link-pattern']
 
         def patch_links(text):
             m, chunks = matcher(text), []
