@@ -134,25 +134,17 @@ class ContentLoader(object):
             self.db_save(all_content)
 
 
+
     def custom_filters(self, all_content):
         '''
         Project-specific filtering 
         '''
-        for content in all_content:
-            # Clean up learn-more section
-            learn = content.get('learn-more')
-            if learn:
-                clean = [L for L in learn if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
-                content['learn-more'] = clean
-        return all_content
-
-
-        matcher = re.compile(r'\[([^\]]*)\]\(([^)]+)\)').search
-        def patch_markdown(text):
+        def patch_links(text):
+            matcher = re.compile(r'\[([^\]]*)\]\(((?!http)[^)]+)\)').search
             m, chunks = matcher(text), []
             while m:
                 link_text, module_name, _, end = *m.groups(), *m.span()
-                content = self.find_content(module_name, all_content, thresh=50)
+                content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
                         replacement = '[%s](%s)' % (link_text, content['slug'])
@@ -163,36 +155,29 @@ class ContentLoader(object):
                     chunks.append(text[:end])
                 text = text[end:]
                 m = matcher(text)
-            print(chunks)
-            return ''.join(chunks)
+            return ''.join(chunks) + text
+
+        visit_all = lambda x: {
+            list:   lambda L: [visit_all(i) for i in L],
+            dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
+            str:    lambda s: patch_links(s),
+        }[dict if isinstance(x, dict) else type(x)](x)
 
         for content in all_content:
-            if 'bt-link' in content and 'image' not in content:
-                print('bt-link', content['bt-link'])
-        for content in all_content:
+            # Clean up learn-more section
+            learn = content.get('learn-more')
+            if learn:
+                clean = [L for L in learn if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
+                content['learn-more'] = clean
+            examples = content.get('real-world-examples')
+            # Clean up real-world-examples section
+            if examples:
+                pass
+            # Patch up links between modules
             for field in self.config['markdown']:
-                the_field = content.get(field)
-                if the_field:
-                    content[field] = [patch_markdown(i) for i in the_field] if isinstance(the_field, list) else patch_markdown(the_field)
+                if content.get(field):
+                    content[field] = visit_all(content.get(field))
         return all_content
-
-             #      match, chunks = link_matcher(text), []
-             #      while match:
-             #          title, url, start, end = *match.groups(), *match.span()
-             #          other_module = find_content(url, all_content, thresh=100)
-             #          if other_module:
-             #              if title:
-             #                  replacement = '[{}]({})'.format(title, other_module['slug'])
-             #              else:
-             #                  replacement = '(see [{}: {}]({}))'.format(other_module['type'].upper(), other_module['title'], other_module['slug'])
-             #              chunks.append(re.sub(re.escape(match.group()), replacement, text[:end]))
-             #          else:
-             #              chunks.append(text[:end])
-             #          text = text[end:]
-             #          match = link_matcher(text)
-             #      content[field] = ''.join(chunks)
-                        
-
 
 
     def parse_markup(self, text):
@@ -478,7 +463,7 @@ class ContentLoader(object):
 
         # Add translated content to a translations dict in each default language piece
         for translation in content_translated:
-            default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=75)
+            default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=90)
             if not default:
                 log("skip: {} can't find default language version {}".format(translation.get('title'), translation.get('default-language-content')))
                 continue
