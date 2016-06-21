@@ -138,7 +138,7 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
-        matcher = re.compile(r'\[([^\]]*)\]\(((?!http)[^)]+)\)').search
+        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)').search
         xrefpat = self.config['xref-link-pattern']
 
         def patch_links(text):
@@ -162,6 +162,7 @@ class ContentLoader(object):
             list:   lambda L: [visit_all(i) for i in L],
             dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
             str:    lambda s: patch_links(s),
+            int:    lambda i: i,
         }[dict if isinstance(x, dict) else type(x)](x)
 
         for content in all_content:
@@ -419,7 +420,7 @@ class ContentLoader(object):
 
     def add_language_tags(self, all_content):
         '''
-        Add language tags to content items
+        Detect the language of each content item and add a language tag
         '''
         language_suffixes = ['-'+lang for lang in self.config['language-all']]
         for content in all_content:
