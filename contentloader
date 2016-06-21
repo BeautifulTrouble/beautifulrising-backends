@@ -6,10 +6,10 @@ import autovenv
 autovenv.run()
 
 import argparse
-import datetime
 import os
 import re
 import sys
+from datetime import datetime
 from itertools import zip_longest
 from pprint import pprint
 from string import capwords
@@ -301,7 +301,7 @@ class ContentLoader(object):
         '''
         Request push notifications for entire drive be sent to the notification-url
         '''
-        now = datetime.datetime.utcnow()
+        now = datetime.utcnow()
         expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
         self.drive.execute(self.drive.service.changes().watch(body={
             'id': '{}-{}'.format(DRIVE_CLIENT_NAME, expiration),
@@ -352,17 +352,6 @@ class ContentLoader(object):
         return documents
 
 
-    def simple_timestamp(self, rfc3339):
-        '''
-        Make a simple javascript-style timestamp from an RFC3339 date
-        '''
-        try:
-            stamp = datetime.datetime.strptime(rfc3339, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except:
-            stamp = datetime.datetime.now()
-        return int(stamp.timestamp() * 1000)
-
-
     def extract_and_transform(self, document):
         '''
         Process a document and return a content item.
@@ -386,7 +375,7 @@ class ContentLoader(object):
 
         # Add a few useful bits
         content['slug'] = slugify(content.get('title', ''), allow=':')
-        content['timestamp'] = self.simple_timestamp(document.modifiedDate)
+        content['timestamp'] = int(1000 * datetime.strptime(document.modifiedDate, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp())
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
@@ -536,7 +525,7 @@ class ContentLoader(object):
 
         if report:
             title = 'Content Error Report'
-            timestamp = datetime.datetime.utcnow()
+            timestamp = datetime.utcnow()
             html = jinja2.Template('''
                 <style>* { font-family: "Consolas"; }</style>
                 <h1>{{ title }}</h1>
