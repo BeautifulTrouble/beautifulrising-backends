@@ -49,6 +49,7 @@ class ContentLoader(object):
             default=[], dest='changes', help="Fetch a single document by its ephemeral change id, "
             "then update associated metadata and assets. Specify multiple times to get multiple "
             "documents at once.")
+        arg_parser_group.add_argument('--assets', action='store_true', help="Download assets only")
         arg_parser_group.add_argument('--watch-docs', action='store_true',
             help="Initiate a request to watch drive for changes. It will expire in one day.")
         arg_parser_group.add_argument('--stop-watching', action='store_true', 
@@ -75,8 +76,12 @@ class ContentLoader(object):
         # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
 
+        # Download assets
+        if self.options.assets:
+            self.download_assets()
+
         # Watch for changes
-        if self.options.watch_docs:
+        elif self.options.watch_docs:
             self.unwatch()
             self.watch()
 
@@ -130,7 +135,7 @@ class ContentLoader(object):
 
             all_content = self.merge_translations(all_content)
             all_content = self.filter_broken_content(all_content)
-            all_content = self.download_assets(all_content)
+            self.download_assets()
             self.db_save(all_content)
 
 
@@ -558,7 +563,7 @@ class ContentLoader(object):
         return good_content
 
 
-    def download_assets(self, all_content):
+    def download_assets(self):
         '''
         Download all top-level assets from top-level folders specified in config['asset-sources']
         '''
@@ -572,7 +577,6 @@ class ContentLoader(object):
                 for file in folder.files:
                     if file.save_as(file.title):
                         log('download: asset "{}"'.format(file.title))
-        return all_content
 
 
 if __name__ == '__main__':
