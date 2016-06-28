@@ -137,7 +137,6 @@ class ContentLoader(object):
             all_content = self.filter_broken_content(all_content)
             self.download_assets()
             self.db_save(all_content)
-            log('status: complete')
 
 
     def custom_filters(self, all_content):

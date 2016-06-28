@@ -112,7 +112,7 @@ def notify():
 
     # Attempt to invoke the content loader
     elif state == 'change':
-        log("change: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
+        log("changed: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
         body = request.get_json()
         if body:
             with script_directory():
