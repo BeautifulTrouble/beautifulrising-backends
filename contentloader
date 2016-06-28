@@ -207,15 +207,19 @@ class ContentLoader(object):
         return next((T for T in self.config['types'] if T['name'] in content), {})
 
 
-    def find_content(self, item_or_name, item_list, thresh=50):
+    def find_content(self, item_or_name, item_list, thresh=50, fuzzy_match_cache={}):
         '''
         Use fuzzy matching to find a content item from a list
         '''
         item_name = item_or_name
         if not isinstance(item_or_name, str):
             item_name = item_or_name['title']
+        cached = fuzzy_match_cache.get(item_name)
+        if cached:
+            return cached
         match = fuzzy(item_name, item_list, processor=lambda m: m['title'])
         if match and match[1] >= thresh:
+            fuzzy_match_cache[item_name] = match[0]
             return match[0]
         return {}
 
