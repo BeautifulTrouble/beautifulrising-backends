@@ -87,18 +87,24 @@ def strip_smartquotes(s):
     return reduce(replace, pairs, s)
 
 
-def log(*s, fatal=False, **kw):
+def log(*s, fatal=False, tty=sys.stdout.isatty(), color='32', **kw): 
     '''
-    Simple "tee-style" logging with timestamps
+    Tee-style logging with timestamps
     '''
-    s = ' '.join(str(i) for i in s)
+    logfmt = ('\x1b[30m[\x1b[{}m{{:^10}}\x1b[30m]\x1b[0m'.format(color) if tty else '[{:^10}]').format
+    if ':' in s[0]:
+        head, tail = s[0].split(':', maxsplit=1)
+        s = [logfmt(head), tail, *s[1:]]
+    s = ' '.join(map(str, s))
     script_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(script_dir, 'log.txt'), 'a', encoding="utf-8") as file:
         file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
-        print(s, **kw)
+    print(s, **kw)
     if fatal:
         print('Quitting.')
         sys.exit(int(fatal))
+
+warn = lambda *s,fatal=False,color='33',**kw: log(*s, fatal=fatal, color=color, **kw)
 
 
 def die(*s):
@@ -116,5 +122,6 @@ __all__ = [
     'slugify', 
     'strip_smartquotes',
     'log', 
+    'warn',
     'die', 
 ]

@@ -137,6 +137,7 @@ class ContentLoader(object):
             all_content = self.filter_broken_content(all_content)
             self.download_assets()
             self.db_save(all_content)
+            log('status: complete')
 
 
     def custom_filters(self, all_content):
@@ -158,11 +159,13 @@ class ContentLoader(object):
                         replacement = '(see: [%s: %s]({}))'.format(xrefpat) % (content['type'].upper(), content['title'], content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 else:
+                    #TODO: do something clever for missing modules?
                     chunks.append(text[:end])
                 text = text[end:]
                 m = matcher(text)
             return ''.join(chunks) + text
 
+        # Recursive visitor reaches all deeply nested strings
         visit_all = lambda x: {
             list:   lambda L: [visit_all(i) for i in L],
             dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
@@ -176,8 +179,8 @@ class ContentLoader(object):
             if learn:
                 clean = [L for L in learn if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
                 content['learn-more'] = clean
-            examples = content.get('real-world-examples')
             # Clean up real-world-examples section
+            examples = content.get('real-world-examples')
             if examples:
                 pass
             # Patch up links between modules
@@ -335,7 +338,7 @@ class ContentLoader(object):
                             'id': channel, 
                             'resourceId': resource,
                         }))
-                        log("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
+                        warn("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
                     except: pass
             del self.db['config:notification-channels']
 
@@ -380,7 +383,7 @@ class ContentLoader(object):
         content['type'] = type
         content['title'] = title = content.get(type)
         if not isinstance(title, str): 
-            log("skip: {} bad type information".format(document.id))
+            warn("skip: {} bad type information".format(document.id))
             return
 
         # Add a few useful bits
@@ -466,7 +469,7 @@ class ContentLoader(object):
         for translation in content_translated:
             default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=90)
             if not default:
-                log("skip: {} can't find default language version {}".format(translation.get('title'), translation.get('default-language-content')))
+                warn("skip: {} can't find default language version {}".format(translation.get('title'), translation.get('default-language-content')))
                 continue
             translations = default.setdefault('translations', {})
             translations[translation['lang']] = translation
@@ -529,7 +532,7 @@ class ContentLoader(object):
             missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
             if missing_items:
                 content['missing-items'] = missing_items
-                log('missing:', content['title'], missing_items)
+                warn('missing:', content['title'], missing_items)
         good_content = [c for c in all_content if 'missing-items' not in c]
 
         if report:
