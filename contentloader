@@ -515,9 +515,8 @@ class ContentLoader(object):
                     content[key] = sorted(found_content)
                     # Ensure the relationships are bi-directional
                     for other in found_content.values():
-                        other_list = other.get(key_referring_to_this_type)
-                        if other_list:
-                            other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
+                        other_list = other.get(key_referring_to_this_type, [])
+                        other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
         return all_content
 
 
