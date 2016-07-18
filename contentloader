@@ -129,11 +129,11 @@ class ContentLoader(object):
                 existing_content[content['slug']] = content
 
             all_content = list(existing_content.values())
-            all_content = self.fix_relationships(all_content)
 
             all_content = self.custom_filters(all_content)
 
             all_content = self.merge_translations(all_content)
+            all_content = self.fix_relationships(all_content)
             all_content = self.filter_broken_content(all_content)
             self.download_assets()
             self.db_save(all_content)
@@ -509,16 +509,17 @@ class ContentLoader(object):
         # Fuzzy match and slugify related content items
         for content in all_content:
             this_slug = {content['slug']}
-            key_referring_to_this_type = types_and_keys.get(content['type'], '')
+            key_referring_to_this_type = types_and_keys.get(content['type'])
             for key,choices in keys_and_choices.items():
                 if key in content:
                     found_content = {c['slug']: c for c in (self.find_content(t, choices, 90)
                                                             for t in content[key]) if c}
                     content[key] = sorted(found_content)
-                    # Ensure the relationships are bi-directional
-                    for other in found_content.values():
-                        other_list = other.get(key_referring_to_this_type, [])
-                        other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
+                    # If anything else relates to this object's type, make relationships bi-directional
+                    if key_referring_to_this_type:
+                        for other in found_content.values():
+                            other_list = other.get(key_referring_to_this_type, [])
+                            other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
         return all_content
 
 
