@@ -176,12 +176,12 @@ class ContentLoader(object):
             # Clean up learn-more section
             learn = content.get('learn-more')
             if learn:
-                clean = [L for L in learn if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
-                content['learn-more'] = clean
+                content['learn-more'] = [L for L in learn 
+                    if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
             # Clean up real-world-examples section
             examples = content.get('real-world-examples')
             if examples:
-                pass
+                content['real-world-examples'] = [e for e in examples if all(map(e.get, ['title','link','description']))]
             # Patch up links between modules
             for field in self.config['markdown']:
                 if content.get(field):
