@@ -182,6 +182,14 @@ class ContentLoader(object):
             examples = content.get('real-world-examples')
             if examples:
                 content['real-world-examples'] = [e for e in examples if all(map(e.get, ['title','link','description']))]
+            # Clean up some snapshots with example write ups
+            full_write_up = content.get('full-write-up')
+            if full_write_up and re.search(r'In a page \(500 words\) or less', full_write_up):
+                del content['full-write-up']
+            # Clean up some modules with example tags
+            tags = content.get('tags')
+            if tags and all(t in tags for t in ['Corruption', 'Mining', 'Gender & Sexuality']):
+                del content['tags']
             # Patch up links between modules
             for field in self.config['markdown']:
                 if content.get(field):
