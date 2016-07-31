@@ -13,6 +13,7 @@ from datetime import datetime
 from itertools import zip_longest
 from pprint import pprint
 from string import capwords
+from subprocess import Popen
 from urllib.parse import urljoin
 
 import archieml
@@ -294,6 +295,7 @@ class ContentLoader(object):
         # Download top-level assets from this top-level folder to this (relative) local path
         c.setdefault('asset-sources', ['ASSETS'])
         c.setdefault('asset-path', '/assets/content')
+        c.setdefault('asset-image-sizes', {})
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -591,6 +593,9 @@ class ContentLoader(object):
                 for file in folder.files:
                     if file.save_as(file.title):
                         log('download: asset "{}"'.format(file.title))
+                        if 'image' in file.attributes['mimeType']:
+                            for prefix,width in self.config['asset-image-sizes'].items():
+                                Popen(['convert', '-resize', width+'x', file.title, prefix+file.title])
 
 
 if __name__ == '__main__':
