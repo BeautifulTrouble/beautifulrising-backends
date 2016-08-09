@@ -50,7 +50,8 @@ class ContentLoader(object):
             default=[], dest='changes', help="Fetch a single document by its ephemeral change id, "
             "then update associated metadata and assets. Specify multiple times to get multiple "
             "documents at once.")
-        arg_parser_group.add_argument('--assets', action='store_true', help="Download assets only")
+        arg_parser_group.add_argument('--assets', action='store_true', help="Download and convert "
+            "all assets. Use after changing asset settings in the config.")
         arg_parser_group.add_argument('--watch-docs', action='store_true',
             help="Initiate a request to watch drive for changes. It will expire in one day.")
         arg_parser_group.add_argument('--stop-watching', action='store_true', 
@@ -79,7 +80,7 @@ class ContentLoader(object):
 
         # Download assets
         if self.options.assets:
-            self.download_assets()
+            self.download_assets(force_conversion=True)
 
         # Watch for changes
         elif self.options.watch_docs:
@@ -296,6 +297,7 @@ class ContentLoader(object):
         c.setdefault('asset-sources', ['ASSETS'])
         c.setdefault('asset-path', '/assets/content')
         c.setdefault('asset-image-sizes', {})
+        c.setdefault('asset-image-quality', '85%')
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -579,7 +581,7 @@ class ContentLoader(object):
         return good_content
 
 
-    def download_assets(self):
+    def download_assets(self, force_conversion=False):
         '''
         Download all top-level assets from top-level folders specified in config['asset-sources']
         '''
@@ -591,11 +593,19 @@ class ContentLoader(object):
             for source in self.config['asset-sources']:
                 folder = self.root.folder(source)
                 for file in folder.files:
+                    convert = force_conversion
                     if file.save_as(file.title):
                         log('download: asset "{}"'.format(file.title))
-                        if 'image' in file.attributes['mimeType']:
-                            for prefix,width in self.config['asset-image-sizes'].items():
-                                Popen(['convert', '-resize', width+'x', file.title, prefix+file.title])
+                        convert = True
+                    if convert and file.attributes['mimeType'] in ('image/png', 'image/jpeg'):
+                        log('convert: asset "{}"'.format(file.title))
+                        for prefix,width in self.config['asset-image-sizes'].items():
+                            Popen([
+                                'convert', 
+                                '-quality', self.config['asset-image-quality'], 
+                                '-resize', width + 'x', 
+                                file.title, prefix + file.title
+                            ])
 
 
 if __name__ == '__main__':
