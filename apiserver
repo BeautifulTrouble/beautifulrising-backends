@@ -14,7 +14,7 @@ import couchdb
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, url_for
 from flask_restful import Resource, Api
-from flask.ext.compress import Compress
+from flask_compress import Compress
 from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
