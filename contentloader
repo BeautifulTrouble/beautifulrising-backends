@@ -9,6 +9,7 @@ import argparse
 import os
 import re
 import sys
+from copy import deepcopy
 from datetime import datetime
 from itertools import zip_longest
 from pprint import pprint
@@ -465,13 +466,18 @@ class ContentLoader(object):
         into the content object for the default language. They will be placed into a 
         'translations' dictionary under two-letter language code keys.
         '''
+        language_all = self.config['language-all']
+        language_default = self.config['language-default']
+        language_other = set(language_all) - set(language_default)
+        #language_add = self.config['language-add']
+        #language_remove = self.config['language-remove']
         content_primary = []
         content_translated = []
 
         # Sort content by language
         self.add_language_tags(all_content)
         for content in all_content:
-            if content['lang'] == self.config['language-default']:
+            if content['lang'] == language_default:
                 content_primary.append(content)
             else:
                 content_translated.append(content)
@@ -486,20 +492,38 @@ class ContentLoader(object):
             translations[translation['lang']] = translation
             log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], default['title']))
 
-        # Look through primary language documents and move translated keys into place
+        # Recursive in-place dictionary merging function to be used on COPIES of destination dicts
+        def merge_dicts(dest, src):
+            for k, v in src.items():
+                if isinstance(dest.get(k), dict) and isinstance(v, dict):
+                    merge_dicts(dest[k], v)
+                else:
+                    dest[k] = v
+
+        # Look through primary language documents and integrate keys with language code suffixes (-es, -fr)
         for content in content_primary:
             content.setdefault('translations', {})
-            for lang in self.config['language-all']:
-                keys = [k for k in content if isinstance(k, str) and k.endswith('-'+lang)]
-                inline = {k[:-3]: content[k] for k in keys if content[k]}
-                if inline:
-                    if lang == self.config['language-default']:
-                        content.update(inline)
-                    else:
-                        lang_dict = content['translations'].setdefault(lang, {})
-                        lang_dict.update(inline)
-                    [content.pop(k) for k in keys]
-                    print(lang, '-=>', inline) #TODO: remove
+            # Merge the default language first, simply replacing objects without merging subkeys
+            default_language_keys = [k for k in content if isinstance(k, str) and k.endswith('-' + language_default)]
+            content.update({k[:-3]: content[k] for k in default_language_keys if content[k]})
+            [content.pop(k) for k in default_language_keys]
+            # Merge the remaining languages into the default language
+            for lang in language_other:
+                # Get inline translations to be merged and remove them from the content object
+                language_keys = [k for k in content if isinstance(k, str) and k.endswith('-' + lang)]
+                language_new = {k[:-3]: content[k] for k in language_keys if content[k]}
+                [content.pop(k) for k in language_keys]
+                if language_new:
+                    # Get any existing translations and update the simple keys
+                    language_dict = content['translations'].setdefault(lang, {})
+                    language_dict.update(language_new)
+                    # Copy dicts from the original content, merge translations into them, then update the existing translations
+                    default_language_dicts_to_merge_into = {k: deepcopy(content[k]) for k,v in language_new.items()
+                                                            if isinstance(content.get(k), dict)}
+                    [merge_dicts(v, language_new[k]) for k,v in default_language_dicts_to_merge_into.items()]
+                    language_dict.update(default_language_dicts_to_merge_into)
+
+        # TODO: language-add / language-remove (currently performed by API server)
 
         # All content is now in this merged list
         return content_primary
