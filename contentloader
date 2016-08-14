@@ -176,29 +176,45 @@ class ContentLoader(object):
         }[dict if isinstance(x, dict) else type(x)](x)
 
         for content in all_content:
-            # Clean up learn-more section
-            learn = content.get('learn-more')
-            if learn:
-                content['learn-more'] = [L for L in learn 
-                    if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
-            # Clean up real-world-examples section
-            examples = content.get('real-world-examples')
-            if examples:
-                content['real-world-examples'] = [e for e in examples if all(map(e.get, ['title','link','description']))]
-            # Clean up some snapshots with example write ups
-            full_write_up = content.get('full-write-up')
-            if full_write_up and re.search(r'In a page \(500 words\) or less', full_write_up):
-                del content['full-write-up']
-            # Clean up some modules with example tags
-            tags = content.get('tags')
-            if tags and all(t in tags for t in ['Corruption', 'Mining', 'Gender & Sexuality']):
-                del content['tags']
-            # Patch up links between modules
-            for field in self.config['markdown']:
-                if content.get(field):
-                    content[field] = visit_all(content.get(field))
-            if content['type'] == 'person' and 'email' in content:
-                del content['email']
+            # TODO: merge this back into the major refactor branch
+            if '_new_content' in content:
+                # Clean up learn-more section
+                learn = content.get('learn-more')
+                if learn:
+                    content['learn-more'] = [L for L in learn 
+                        if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
+                # Clean up real-world-examples section
+                examples = content.get('real-world-examples')
+                if examples:
+                    content['real-world-examples'] = [e for e in examples if all(map(e.get, ['title','link','description']))]
+                # Clean up some snapshots with example write ups
+                full_write_up = content.get('full-write-up')
+                if full_write_up and re.search(r'In a page \(500 words\) or less', full_write_up):
+                    del content['full-write-up']
+                # Clean up some modules with example tags
+                tags = content.get('tags')
+                if tags and all(t in tags for t in ['Corruption', 'Mining', 'Gender & Sexuality']):
+                    del content['tags']
+                # Patch up links between modules
+                for field in self.config['markdown']:
+                    if content.get(field):
+                        content[field] = visit_all(content.get(field))
+                if content['type'] == 'person' and 'email' in content:
+                    del content['email']
+                # TODO: add CONFIG section for translated strings used by the contentloader
+                authors = content.get('authors')
+                if authors:
+                    authors = sorted(authors)
+                    if len(authors) == 1:
+                        content['byline'] = authors[0]
+                    elif len(authors) == 2:
+                        content['byline-en'] = ' and '.join(authors)
+                        content['byline-es'] = ' y '.join(authors)
+                        content['byline-ar'] = ' \u0648 '.join(authors)
+                    else:
+                        content['byline-en'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
+                        content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
+                        content['byline-ar'] = ' \u0648 '.join(authors)
         return all_content
 
 
@@ -384,6 +400,7 @@ class ContentLoader(object):
         Process a document and return a content item.
         '''
         content = self.parse_markup(document.text)
+        content['_new_content'] = True
 
         # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
