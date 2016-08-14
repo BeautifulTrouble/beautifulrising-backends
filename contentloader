@@ -132,6 +132,7 @@ class ContentLoader(object):
                 existing_content[content['slug']] = content
 
             all_content = list(existing_content.values())
+            all_content = self.add_language_tags(all_content)
 
             all_content = self.custom_filters(all_content)
 
@@ -148,6 +149,7 @@ class ContentLoader(object):
         '''
         matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)').search
         xrefpat = self.config['xref-link-pattern']
+        language_default = self.config['language-default']
 
         def patch_links(text):
             m, chunks = matcher(text), []
@@ -203,18 +205,23 @@ class ContentLoader(object):
                     del content['email']
                 # TODO: add CONFIG section for translated strings used by the contentloader
                 authors = content.get('authors')
-                if authors:
+                if authors and content['lang'] == language_default:
                     authors = sorted(authors)
                     if len(authors) == 1:
+                        print('adding 1 byline')
                         content['byline'] = authors[0]
                     elif len(authors) == 2:
-                        content['byline-en'] = ' and '.join(authors)
+                        print('adding 2 byline')
+                        content['byline'] = ' and '.join(authors)
                         content['byline-es'] = ' y '.join(authors)
                         content['byline-ar'] = ' \u0648 '.join(authors)
                     else:
-                        content['byline-en'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
+                        print('adding 2+ byline')
+                        content['byline'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
                         content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
                         content['byline-ar'] = ' \u0648 '.join(authors)
+                    print(content['byline'])
+                del content['_new_content']
         return all_content
 
 
@@ -477,6 +484,7 @@ class ContentLoader(object):
                 except:
                     lang = self.config['language-default']
                 content['lang'] = lang
+        return all_content
 
 
     def merge_translations(self, all_content):
@@ -494,7 +502,6 @@ class ContentLoader(object):
         content_translated = []
 
         # Sort content by language
-        self.add_language_tags(all_content)
         for content in all_content:
             if content['lang'] == language_default:
                 content_primary.append(content)
