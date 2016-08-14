@@ -208,19 +208,15 @@ class ContentLoader(object):
                 if authors and content['lang'] == language_default:
                     authors = sorted(authors)
                     if len(authors) == 1:
-                        print('adding 1 byline')
                         content['byline'] = authors[0]
                     elif len(authors) == 2:
-                        print('adding 2 byline')
                         content['byline'] = ' and '.join(authors)
                         content['byline-es'] = ' y '.join(authors)
                         content['byline-ar'] = ' \u0648 '.join(authors)
                     else:
-                        print('adding 2+ byline')
                         content['byline'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
                         content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
                         content['byline-ar'] = ' \u0648 '.join(authors)
-                    print(content['byline'])
                 del content['_new_content']
         return all_content
 
