@@ -197,6 +197,8 @@ class ContentLoader(object):
             for field in self.config['markdown']:
                 if content.get(field):
                     content[field] = visit_all(content.get(field))
+            if content['type'] == 'person' and 'email' in content:
+                del content['email']
         return all_content
 
 
