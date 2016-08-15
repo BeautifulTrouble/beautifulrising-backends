@@ -312,7 +312,7 @@ class ContentLoader(object):
         # Fields which should be parsed with markdown and "normalization"
         c.setdefault('normalize', [])
         c.setdefault('markdown', [])
-        c.setdefault('xref-link-pattern', '/module/%s')
+        c.setdefault('xref-link-pattern', '/tool/%s')
         # Fields which should be indexed by client search engines
         c.setdefault('search', [])
         # Download top-level assets from this top-level folder to this (relative) local path
