@@ -181,11 +181,11 @@ class ContentLoader(object):
         for content in all_content:
             if '_new_content' in content:
                 # Add a module-type
-                if content['type'] in module_types and not content.get('module-type'):
+                if content['type'] in module_types:
                     content['module-type'] = 'full'
-                    if re.search('SNAPSHOT', content['title']):
+                    if re.search('SNAPSHOT', content['document_title']):
                         content['module-type'] = 'snapshot'
-                    elif re.search('GALLERY', content['title']):
+                    elif re.search('GALLERY', content['document_title']):
                         content['module-type'] = 'gallery'
                 # Clean up learn-more section
                 learn = content.get('learn-more')
