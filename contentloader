@@ -316,8 +316,7 @@ class ContentLoader(object):
         c.setdefault('plural-keys-collate', {})
         # Relationships between content items
         c.setdefault('relationships', {})
-        # Fields which should be parsed with markdown and "normalization"
-        c.setdefault('normalize', [])
+        # Fields which should be parsed with markdown parser
         c.setdefault('markdown', [])
         c.setdefault('xref-link-pattern', '/tool/%s')
         # Fields which should be indexed by client search engines
@@ -461,12 +460,6 @@ class ContentLoader(object):
             if collated_dicts:
                 content[output] = collated_dicts
 
-        # Apply the "normalization" filter which is curently just capitalized words
-        for field in self.config['normalize']:
-            obj = content.get(field)
-            if obj:
-                content[field] = [capwords(w) for w in obj] if isinstance(obj, list) else capwords(obj)
-        
         log("extract: {} ({}: {})".format(document.id, type, content['title']))
         return content
 
