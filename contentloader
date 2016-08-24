@@ -177,9 +177,16 @@ class ContentLoader(object):
             int:    lambda i: i,
         }[dict if isinstance(x, dict) else type(x)](x)
 
+        module_types = [t['one'] for t in self.config['types-modules']]
         for content in all_content:
-            # TODO: merge this back into the major refactor branch
             if '_new_content' in content:
+                # Add a module-type
+                if content['type'] in module_types and not content.get('module-type'):
+                    content['module-type'] = 'full'
+                    if re.match('SNAPSHOT', content['title']):
+                        content['module-type'] = 'snapshot'
+                    elif re.match('GALLERY', content['title']):
+                        content['module-type'] = 'gallery'
                 # Clean up learn-more section
                 learn = content.get('learn-more')
                 if learn:
