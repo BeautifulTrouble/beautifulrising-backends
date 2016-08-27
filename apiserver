@@ -7,7 +7,6 @@ autovenv.run()
 import json
 import os
 import sys
-from subprocess import Popen
 from urllib.parse import urlparse, unquote
 
 import couchdb
@@ -108,7 +107,7 @@ def notify():
     # TODO: new document tracking system by id
     elif state == 'delete':
         print('delete', request.get_json())
-        # XXX: pid = Popen([sys.executable, "contentloader", "--delete-id", doc_id]).pid
+        # XXX: venv_run("contentloader", "--delete-id", doc_id)
 
     # Attempt to invoke the content loader
     elif state == 'change':
@@ -117,9 +116,7 @@ def notify():
         if body:
             with script_directory():
                 change_number = str(int(body['id']))
-                # Using sys.executable ensures the virtualenv currently in effect 
-                # for this server will also be used for the contentloader tool.
-                pid = Popen([sys.executable, "contentloader", "--change-id", change_number]).pid
+                venv_run("contentloader", "--change-id", change_number)
 
     # 204 No Content (success)
     return ('', 204)

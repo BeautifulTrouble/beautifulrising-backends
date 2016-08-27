@@ -6,9 +6,18 @@ import os
 import re
 import sys
 from functools import reduce
+from subprocess import Popen
 
 import magic
 import unidecode
+
+
+def venv_run(path, *args):
+    '''
+    Convenience function for running a python process within the same virtualenv
+    as the caller.
+    '''
+    return Popen([sys.executable, path, *args]).pid
 
 
 @contextlib.contextmanager
@@ -115,6 +124,7 @@ def die(*s):
 
 
 __all__ = [
+    'venv_run',
     'script_directory', 
     'script_subdirectory', 
     'only_one_process',

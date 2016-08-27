@@ -655,6 +655,6 @@ class ContentLoader(object):
 
 
 if __name__ == '__main__':
-    with only_one_process():
+    with only_one_process('toolbox'):
         ContentLoader()
 
