@@ -26,16 +26,7 @@ import requests
 from fuzzywuzzy.process import extractOne as fuzzy
 
 from utils import *
-
-
-DB_NAME = 'toolbox'
-DB_SERVER = 'http://127.0.0.1:5984/'
-
-CONFIG_FILE_NAME = 'CONFIG'
-ROOT_FOLDER_NAME = 'BR CONTENT'
-
-DRIVE_CLIENT_NAME = 'beautiful-rising'
-SERVICE_ACCOUNT_JSON_FILENAME = 'beautiful-rising-eae5ff71ae04.json'
+from config import *
 
 
 class ContentLoader(object):
@@ -71,12 +62,12 @@ class ContentLoader(object):
         # Connect to Google Drive and get the root folder
         self.drive = driveclient.DriveClient(DRIVE_CLIENT_NAME,
             scopes='https://www.googleapis.com/auth/drive',
-            service_account_json_filename=SERVICE_ACCOUNT_JSON_FILENAME)
-        self.root = self.drive.folder(ROOT_FOLDER_NAME) 
+            service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
+        self.root = self.drive.folder(DRIVE_ROOT_FOLDER_NAME) 
         if not self.root:
             die("Can't find the root folder!")
 
-        # Load CONFIG_FILE_NAME from ROOT_FOLDER_NAME and store as "config:api" & self.config
+        # Load DRIVE_CONFIG_FILE_NAME from DRIVE_ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
 
         # Download assets
@@ -291,7 +282,7 @@ class ContentLoader(object):
         requests.put(urljoin(DB_SERVER, DB_NAME+'/_revs_limit'), data='50').status_code
 
         # Load configuration document and set defaults
-        document = self.root.file(CONFIG_FILE_NAME)
+        document = self.root.file(DRIVE_CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")
         self.config = c = self.parse_markup(document.text)
@@ -337,7 +328,7 @@ class ContentLoader(object):
         # Save the config before creating lots of temporary language-related data within it
         c.update(type='config', slug='api')
         self.db_save(c)
-        log('load: configuration options from drive document "{}"'.format(CONFIG_FILE_NAME))
+        log('load: configuration options from drive document "{}"'.format(DRIVE_CONFIG_FILE_NAME))
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
         # of synonyms, plural-keys, and plural-keys-collate (where each entry is a nested list).
@@ -655,6 +646,6 @@ class ContentLoader(object):
 
 
 if __name__ == '__main__':
-    with only_one_process('toolbox'):
+    with only_one_process(DB_NAME):
         ContentLoader()
 

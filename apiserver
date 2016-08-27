@@ -17,11 +17,7 @@ from flask_compress import Compress
 from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
-
-
-PORT = 6000
-PREFIX = 'api/v1'
-GOOGLE_VERIFICATION = 'google5844dd3c739be066.html'
+from config import *
 
 
 app = Flask(__name__)
@@ -29,7 +25,7 @@ api = Api(app)
 Compress(app)
 
 couch = couchdb.Server()
-db = couch['toolbox']
+db = couch[DB_NAME]
 
 
 class CouchDocumentAccessor(object):
@@ -154,9 +150,13 @@ def filter_by_language(resources, args):
     return output
 
 
+# Endpoints 
+#////////////////////////////////////////////////////////////////////////////
+
 # Get content types and create endpoints
 types = {slugify(T['one']): slugify(T['many']) for T in config['types']}
 for singular_name,plural_name in types.items():
+
     class Many(Resource):
         type = singular_name
         query = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}" % singular_name
@@ -166,8 +166,7 @@ for singular_name,plural_name in types.items():
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
             return filter_by_language(resources, args)
-    api.add_resource(Many, '/{PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
-
+    api.add_resource(Many, '/{API_PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
     class One(Resource):
         type = singular_name
@@ -177,12 +176,13 @@ for singular_name,plural_name in types.items():
                 resource = db['{}:{}'.format(self.type, id)]
             except ResourceNotFound: raise NotFound
             return filter_by_language([resource], args)[0]
-    api.add_resource(One, '/{PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
+    api.add_resource(One, '/{API_PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
 
 
 # Get the grouped types and create endpoints
 groups = {k.split('-',1)[-1]:[slugify(d['one']) for d in v] for k,v in config.items() if k.startswith('types-')}
 for group,types in groups.items():
+
     class Group(Resource):
         types = types
         query = "function(doc){if(%s.indexOf(doc.type)!=-1){emit(doc.slug,doc)}}" % json.dumps(types)
@@ -192,7 +192,7 @@ for group,types in groups.items():
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
             return filter_by_language(resources, args)
-    api.add_resource(Group, '/{PREFIX}/{group}'.format(**vars()), endpoint=group)
+    api.add_resource(Group, '/{API_PREFIX}/{group}'.format(**vars()), endpoint=group)
 
 
 # Just emit all the documents
@@ -204,14 +204,14 @@ class All(Resource):
             resources = [doc['value'] for doc in db.query(self.query)]
         except (KeyError, ResourceNotFound): raise NotFound
         return filter_by_language(resources, args)
-api.add_resource(All, '/{PREFIX}/all'.format(**vars()), endpoint='all')
+api.add_resource(All, '/{API_PREFIX}/all'.format(**vars()), endpoint='all')
 
 
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
         return {k:v for k,v in config.items() if k not in config['config-hidden-keys']}
-api.add_resource(Config, '/{PREFIX}/config'.format(**vars()))
+api.add_resource(Config, '/{API_PREFIX}/config'.format(**vars()))
 
 
 # Expose the endpoints
@@ -225,5 +225,5 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 
 
 if __name__ == '__main__':
-    app.run(port=PORT, debug='--debug' in sys.argv)
+    app.run(port=6000, debug='--debug' in sys.argv)
 
