@@ -13,6 +13,7 @@ Just add these lines to the top of your program:
 __version__ = '0.2'
 
 
+import os
 import sys
 
 
@@ -28,17 +29,14 @@ def log(marker, *strings, **kw):
         sys.exit(int(kw['error']))
 
 
-# Python < 3.3
-if float('%s.%s' %(sys.version_info.major, sys.version_info.minor)) < 3.3:
+if os.environ.get('SERVER_SOFTWARE') or float('%s.%s' %(sys.version_info.major, sys.version_info.minor)) < 3.3:
 
     def run(**kw):
-        log('i',  "Autovenv requires Python 3.3 or greater; please set up a virtualenv manually")
+        log('i',  "Autovenv won't run in this environment. Please set up a virtualenv manually.")
 
-# Python >= 3.3
 else:
 
     import inspect
-    import os
     import shutil
     import subprocess
     import venv
