@@ -45,6 +45,17 @@ config = CouchDocumentAccessor('config:api')
 
 # Google administrative mumbo jumbo
 # ////////////////////////////////////////////////////////////////////////////
+def recaptcha_is_valid():
+    '''
+    Validate a properly implemented front-end recaptcha form
+    '''
+    return requests.post('https://www.google.com/recaptcha/api/siteverify', data={
+        'secret': RECAPTCHA_SITE_SECRET,
+        'response': request.form.get('g-recaptcha-response'),
+        'remoteip': request.remote_addr,
+    }).json().get('success')
+
+
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     '''
