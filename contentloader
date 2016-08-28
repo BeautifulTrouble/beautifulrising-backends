@@ -285,10 +285,9 @@ class ContentLoader(object):
         c.setdefault('published-filename-regex', r'(?i)\bdone$')
         # Renaming synonymous keys, including those with language-suffixes
         c.setdefault('synonyms', {})
-        # Shuffling content together
+        # Manage single keys which contain lists
         c.setdefault('plural-separator-regex', r'(?:\s*,|\s+and|\s+&)\s+')
         c.setdefault('plural-keys', {})
-        c.setdefault('plural-keys-collate', {})
         # Relationships between content items
         c.setdefault('relationships', {})
         # Fields which should be parsed with markdown parser
@@ -315,13 +314,12 @@ class ContentLoader(object):
         log('load: configuration options from drive document "{}"'.format(DRIVE_CONFIG_FILE_NAME))
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
-        # of synonyms, plural-keys, and plural-keys-collate (where each entry is a nested list).
+        # of synonyms and plural-keys
         add_language_suffixes = lambda D: [D.update(each) for each in
             [{k+'-'+lang: [i+'-'+lang for i in v] if isinstance(v, list) else
                           v+'-'+lang for k,v in D.items()} for lang in self.config['language-all']] ]
         add_language_suffixes(c['synonyms'])
         add_language_suffixes(c['plural-keys'])
-        add_language_suffixes(c['plural-keys-collate'])
 
 
     def watch(self):
@@ -419,21 +417,6 @@ class ContentLoader(object):
                 multiline = re.split(r'\s*\n\s*\n\s*', plural)
                 content[plural_key] = (multiline if len(multiline) > 1 else 
                                        re.split(self.config['plural-separator-regex'], plural))
-
-        # Collate (zip) specific plural data together and give it new names
-        for output,plurals in self.config['plural-keys-collate'].items():
-            collated_lists = zip_longest(*(content.get(existing_key, []) for existing_key in plurals), fillvalue='')
-            # If the output key has a language suffix, remove it from the inner keys
-            if re.search('-(?:{})$'.format('|'.join(self.config['language-all'])), output):
-                sans_suffix = [self.config['plural-keys'][p][:-3] for p in plurals] 
-                collated_dicts = [dict(zip(sans_suffix, L)) for L in collated_lists]
-            # Otherwise create the inner keys normally
-            else:
-                collated_dicts = [dict(zip(map(self.config['plural-keys'].get, plurals), L)) for L in collated_lists]
-            for old_key in plurals:
-                content.pop(old_key, None)
-            if collated_dicts:
-                content[output] = collated_dicts
 
         log("extract: {} ({}: {})".format(document.id, type, content['title']))
         return content
