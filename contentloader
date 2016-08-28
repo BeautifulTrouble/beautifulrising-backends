@@ -287,11 +287,6 @@ class ContentLoader(object):
             die("Can't find a config file!")
         self.config = c = self.parse_markup(document.text)
 
-        # Hiding configuration options from the API
-        c.setdefault('config-hidden-keys', ['notification-token'])
-        # Drive notifications
-        c.setdefault('notification-url', '')
-        c.setdefault('notification-token', '')
         # Language settings
         c.setdefault('language-default', 'en')
         c.setdefault('language-all', ['en'])
@@ -342,18 +337,18 @@ class ContentLoader(object):
 
     def watch(self):
         '''
-        Request push notifications for entire drive be sent to the notification-url
+        Request push notifications for entire drive be sent to the API_NOTIFICATION_URL
         '''
         now = datetime.utcnow()
         expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
         self.drive.execute(self.drive.service.changes().watch(body={
             'id': '{}-{}'.format(DRIVE_CLIENT_NAME, expiration),
             'type': 'web_hook',
-            'address': self.config['notification-url'],
-            'token': self.config['notification-token'],
+            'address': API_NOTIFICATION_URL,
+            'token': API_NOTIFICATION_TOKEN,
             'expiration': expiration,
         }))
-        log("watch: for push notifications at {}".format(self.config['notification-url']))
+        log("watch: for push notifications at {}".format(API_NOTIFICATION_URL))
     
     
     def unwatch(self):
