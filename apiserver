@@ -45,17 +45,6 @@ config = CouchDocumentAccessor('config:api')
 
 # Google administrative mumbo jumbo
 # ////////////////////////////////////////////////////////////////////////////
-def recaptcha_is_valid():
-    '''
-    Validate a properly implemented front-end recaptcha form
-    '''
-    return requests.post('https://www.google.com/recaptcha/api/siteverify', data={
-        'secret': RECAPTCHA_SITE_SECRET,
-        'response': request.form.get('g-recaptcha-response'),
-        'remoteip': request.remote_addr,
-    }).json().get('success')
-
-
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     '''
@@ -111,11 +100,24 @@ def notify():
     return ('', 204)
 
 
-# Language filtering
+# Intake
 # ////////////////////////////////////////////////////////////////////////////
-def filter_by_language(resources, args):
+def recaptcha_is_valid():
     '''
-    Filter a collection of resources down to a single language
+    Validate a properly implemented front-end recaptcha form
+    '''
+    return requests.post('https://www.google.com/recaptcha/api/siteverify', data={
+        'secret': RECAPTCHA_SITE_SECRET,
+        'response': request.form.get('g-recaptcha-response'),
+        'remoteip': request.remote_addr,
+    }).json().get('success')
+
+
+# Output filtering
+# ////////////////////////////////////////////////////////////////////////////
+def filter_output(resources, args):
+    '''
+    Filter the output by language, merge x-language keys, and hide keys
     '''
     language_all = config['language-all']
     language_add = config['language-add']
@@ -124,6 +126,9 @@ def filter_by_language(resources, args):
 
     # Get one valid language no matter what
     lang = ((set(language_all) & set(args.get('lang', ()))) or {language_default}).pop()
+
+    # Identify the keys which should be hidden from the API
+    hidden_keys = {T['one']: T['hidden'].split() for T in config['types'] if 'hidden' in T}
 
     output = []
     for resource in resources:
@@ -141,6 +146,12 @@ def filter_by_language(resources, args):
                 resource['lang'] = lang
         # List available languages
         resource['languages'] = list(translations.keys() | {language_default})
+        
+        # Remove hidden keys
+        if 'type' in resource and resource['type'] in hidden_keys:
+            for key in hidden_keys[resource['type']]:
+                resource.pop(key, None)
+
         output.append(resource)
     return output
 
@@ -170,7 +181,7 @@ def add_cors_headers(response):
 
 
 # Get content types and create endpoints
-types = {slugify(T['one']): slugify(T['many']) for T in config['types']}
+types = {T['one']: T['many'] for T in config['types']}
 for singular_name,plural_name in types.items():
 
     class Many(Resource):
@@ -181,7 +192,7 @@ for singular_name,plural_name in types.items():
             try:
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
-            return filter_by_language(resources, args)
+            return filter_output(resources, args)
     api.add_resource(Many, '/{API_PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
     class One(Resource):
@@ -191,12 +202,12 @@ for singular_name,plural_name in types.items():
             try:
                 resource = db['{}:{}'.format(self.type, id)]
             except ResourceNotFound: raise NotFound
-            return filter_by_language([resource], args)[0]
+            return filter_output([resource], args)[0]
     api.add_resource(One, '/{API_PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
 
 
 # Get the grouped types and create endpoints
-groups = {k.split('-',1)[-1]:[slugify(d['one']) for d in v] for k,v in config.items() if k.startswith('types-')}
+groups = {k.split('-',1)[-1]:[d['one'] for d in v] for k,v in config.items() if k.startswith('types-')}
 for group,types in groups.items():
 
     class Group(Resource):
@@ -207,7 +218,7 @@ for group,types in groups.items():
             try:
                 resources = [doc['value'] for doc in db.query(self.query)]
             except (KeyError, ResourceNotFound): raise NotFound
-            return filter_by_language(resources, args)
+            return filter_output(resources, args)
     api.add_resource(Group, '/{API_PREFIX}/{group}'.format(**vars()), endpoint=group)
 
 
@@ -219,7 +230,7 @@ class All(Resource):
         try:
             resources = [doc['value'] for doc in db.query(self.query)]
         except (KeyError, ResourceNotFound): raise NotFound
-        return filter_by_language(resources, args)
+        return filter_output(resources, args)
 api.add_resource(All, '/{API_PREFIX}/all'.format(**vars()), endpoint='all')
 
 
