@@ -12,14 +12,6 @@ import magic
 import unidecode
 
 
-def venv_run(path, *args):
-    '''
-    Convenience function for running a python process within the same virtualenv
-    as the caller.
-    '''
-    return Popen([sys.executable, path, *args]).pid
-
-
 @contextlib.contextmanager
 def script_directory():
     '''
@@ -70,6 +62,15 @@ def only_one_process(name=None):
             yield
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def venv_run(path, *args):
+    '''
+    Convenience function for running a python process within the same virtualenv
+    as the caller.
+    '''
+    with script_directory():
+        return Popen([sys.executable, path, *args]).pid
 
 
 def mimetype(filename):
