@@ -48,9 +48,6 @@ class ContentLoader(object):
             help="Initiate a request to watch drive for changes. It will expire in one day.")
         arg_parser_group.add_argument('--stop-watching', action='store_true', 
             help="If the db has any record of a watch request, request that it be cancelled.")
-        arg_parser_group.add_argument('--report-broken-docs', action='store_true', 
-            help="Produce a document containing information about documents which lack required "
-            "fields for their type, as specified in the config document.")
         arg_parser_group.add_argument('--delete-db', action='store_true',
             help='Delete any existing database named "{}".'.format(DB_NAME))
         self.options,_ = arg_parser.parse_known_args()
@@ -90,13 +87,6 @@ class ContentLoader(object):
                 self.unwatch()
                 del self.couch[DB_NAME]
 
-        # Produce a report in the root folder about documents which lack required fields
-        elif self.options.report_broken_docs:
-            documents = self.get_documents()
-            all_content = [c for c in map(self.extract_and_transform, documents) if c]
-            all_content = self.merge_translations(all_content)
-            all_content = self.filter_broken_content(all_content, report=True)
-
         # Load content
         else:
             #TODO: in production always unwatch/watch
@@ -129,7 +119,6 @@ class ContentLoader(object):
 
             all_content = self.merge_translations(all_content)
             all_content = self.fix_relationships(all_content)
-            all_content = self.filter_broken_content(all_content)
             self.download_assets()
             self.db_save(all_content)
 
@@ -565,52 +554,6 @@ class ContentLoader(object):
                             other_list = other.get(key_referring_to_this_type, [])
                             other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
         return all_content
-
-
-    def filter_broken_content(self, all_content, report=False):
-        '''
-        Remove content with obvious content problems from all_content
-        '''
-        for content in all_content:
-            required_sets = [r.split('|') for r in self.type_info(content).get('required', [])]
-            missing_items = [' or '.join(s) for s in required_sets if not any(content.get(k) for k in s)]
-            if missing_items:
-                content['missing-items'] = missing_items
-                warn('missing:', content['title'], missing_items)
-        good_content = [c for c in all_content if 'missing-items' not in c]
-
-        if report:
-            title = 'Content Error Report'
-            timestamp = datetime.utcnow()
-            html = jinja2.Template('''
-                <style>* { font-family: "Consolas"; }</style>
-                <h1>{{ title }}</h1>
-                <p>
-                    Modifications to this file will be discarded.<br>
-                    Translated pieces are not currently represented in this report.<br>
-                    Be aware that a field flagged as missing may indicate that the<br>
-                    related document to which it refers is missing or not "DONE."<br>
-                    <em>Updated: {{ timestamp }} UTC</em><br>
-                </p>
-                <hr>
-                {% for content in all_content %}
-                {% if 'missing-items' in content %}
-                <p>
-                    <a href="{{ content.document_link }}">{{ content.document_title }}</a><br>
-                    {% if content.authors %}
-                    {% for author in content.authors %}
-                    <strong>Author:</strong> {{ author }}<br>
-                    {% endfor %}
-                    {% endif %}
-                    <strong>Missing:</strong> {{ content['missing-items']|join(', ') }}
-                </p>
-                <p></p>
-                {% endif %}
-                {% endfor %}
-            ''').render({k:v for k,v in vars().items() if k != 'self'})
-            self.root.write_html(title, html)
-
-        return good_content
 
 
     def download_assets(self, force_conversion=False):
