@@ -20,10 +20,15 @@ from utils import *
 from config import *
 
 
+# App Setup
+# ////////////////////////////////////////////////////////////////////////////
 app = Flask(__name__)
 api = Api(app)
 Compress(app)
 
+
+# CouchDB Setup
+# ////////////////////////////////////////////////////////////////////////////
 couch = couchdb.Server()
 db = couch[DB_NAME]
 
@@ -38,35 +43,8 @@ class CouchDocumentAccessor(object):
 config = CouchDocumentAccessor('config:api')
 
 
-def flatten_args(args, sep=','):
-    '''
-    Flatten a werkzeug MultiDict containing duplicate, optionally comma-
-    separated query parameters to a dictionary of lists without duplicates
-        e.g.:     "?name=foo&tags=a,b&tags=c,d&tags=d"
-        becomes:  {'name': ['foo'], 'tags': ['a', 'c', 'b', 'd']}
-    '''
-    return {k: list({i for splitL in (L.split(sep) for L in args.getlist(k)) for i in splitL})
-            for k in args}
-
-
-def header(name):
-    '''
-    Always get a string, even for missing headers
-    '''
-    return request.headers.get(name, '')
-
-
-@app.after_request
-def add_cors_headers(response):
-    '''
-    Tell browsers it's okay to load from this resource
-    '''
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET')
-    return response
-
-
+# Google administrative mumbo jumbo
+# ////////////////////////////////////////////////////////////////////////////
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     '''
@@ -75,11 +53,15 @@ def google_verification():
     return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
 
 
+# Drive change notification
+# ////////////////////////////////////////////////////////////////////////////
 @app.route(urlparse(config['notification-url']).path, methods=['POST'])
 def notify():
     '''
     Invoke content loader upon change notification
     '''
+    header = lambda name: request.headers.get(name, '')
+
     # Before doing anything, verify the notification token
     if header('X-Goog-Channel-Token') != config['notification-token']:
         raise Forbidden
@@ -118,6 +100,8 @@ def notify():
     return ('', 204)
 
 
+# Language filtering
+# ////////////////////////////////////////////////////////////////////////////
 def filter_by_language(resources, args):
     '''
     Filter a collection of resources down to a single language
@@ -150,8 +134,29 @@ def filter_by_language(resources, args):
     return output
 
 
-# Endpoints 
-#////////////////////////////////////////////////////////////////////////////
+# API Endpoints
+# ////////////////////////////////////////////////////////////////////////////
+def flatten_args(args, sep=','):
+    '''
+    Flatten a werkzeug MultiDict containing duplicate, optionally comma-
+    separated query parameters to a dictionary of lists without duplicates
+        e.g.:     "?name=foo&tags=a,b&tags=c,d&tags=d"
+        becomes:  {'name': ['foo'], 'tags': ['a', 'c', 'b', 'd']}
+    '''
+    return {k: list({i for splitL in (L.split(sep) for L in args.getlist(k)) for i in splitL})
+            for k in args}
+
+
+@app.after_request
+def add_cors_headers(response):
+    '''
+    Tell browsers it's okay to load from this resource
+    '''
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET')
+    return response
+
 
 # Get content types and create endpoints
 types = {slugify(T['one']): slugify(T['many']) for T in config['types']}
@@ -214,7 +219,7 @@ class Config(Resource):
 api.add_resource(Config, '/{API_PREFIX}/config'.format(**vars()))
 
 
-# Expose the endpoints
+# Expose the endpoints themselves
 class Endpoints(Resource):
     def get(self):
         return {rule.endpoint: {
@@ -224,6 +229,9 @@ class Endpoints(Resource):
 api.add_resource(Endpoints, '/'.format(**vars()))
 
 
+# Run when invoked from the command line
+# ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':
     app.run(port=6000, debug='--debug' in sys.argv)
+
 
