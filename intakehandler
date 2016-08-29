@@ -26,14 +26,15 @@ ARRAY_KEY = 'contributed'
 HEADER = '''
     <style>
         * { font-family: "Verdana"; }
-        .markup { font-weight: bold; font-size: 14pt; }
-        .disclaimer { color: #999999; font-size: 9pt; font-style: italic; }
+        .markup { font-weight: bold; font-size: 18pt; }
+        .disclaimer { color: #999999; font-style: italic; }
     </style>
     <h1>text: {{ title }}</h1>
     <p class="disclaimer">
         This document was produced automatically on %s by the beautifulrising.org
         website. You can make careful changes to the <strong>[%s]</strong> list
-        below, but comments and any other text will be overwritten when it is updated.
+        below, but comments and any other text will be overwritten when the next
+        contribution is submitted.
     </p>
     <p>&nbsp;</p>
 ''' % (time.strftime('%B %e, %Y'), ARRAY_KEY)
