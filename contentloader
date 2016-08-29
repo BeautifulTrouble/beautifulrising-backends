@@ -17,7 +17,6 @@ from string import capwords
 from subprocess import Popen
 from urllib.parse import urljoin
 
-import archieml
 import couchdb
 import driveclient
 import jinja2
@@ -206,19 +205,6 @@ class ContentLoader(object):
         return all_content
 
 
-    def parse_markup(self, text):
-        '''
-        Abstract all markup preprocessing and parsing to this function
-        '''
-        # What is this, macrosoft wandows?
-        text = text.replace('\r', '')
-        # Obliterate ALL of google's [a][b][c] comment annotations!
-        text = re.sub(r'^\[[a-z]\].+$', '', text, flags=re.M)
-        text = re.sub(r'\[[a-z]\]', '', text)
-        # Undo some of the auto-capitalization google docs inflicts
-        return {k.lower(): v for k,v in archieml.loads(text).items() if v}
-
-
     def find_content(self, item_or_name, item_list, thresh=50, fuzzy_match_cache={}):
         '''
         Use fuzzy matching to find a content item from a list
@@ -265,7 +251,7 @@ class ContentLoader(object):
         document = self.root.file(DRIVE_CONFIG_FILE_NAME)
         if not document:
             die("Can't find a config file!")
-        self.config = c = self.parse_markup(document.text)
+        self.config = c = parse_archieml(document.text)
 
         # Language settings
         c.setdefault('language-default', 'en')
@@ -370,7 +356,7 @@ class ContentLoader(object):
         '''
         Process a document and return a content item.
         '''
-        content = self.parse_markup(document.text)
+        content = parse_archieml(document.text)
         content['_new_content'] = True
 
         # Rename synonymous keys (this should happen before all other transformations)
