@@ -8,15 +8,19 @@ import sys
 from functools import reduce
 from subprocess import Popen
 
+import archieml
 import magic
 import unidecode
+
+
+DEBUG = '--debug' in sys.argv
 
 
 @contextlib.contextmanager
 def script_directory():
     '''
     A context manager which allows you to write blocks of code which run within 
-    the current script's directory. The working directory is restored afterward.
+    this script's directory. The working directory is restored afterward.
     '''
     cwd = os.getcwd()
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -29,9 +33,9 @@ def script_directory():
 @contextlib.contextmanager
 def script_subdirectory(name):
     '''
-    A context manager which allows you to write blocks of code which run within a 
-    subdirectory of the current script's directory. The subdirectory is created if 
-    it does not exist, and the working directory is restored after completion.
+    A context manager which allows you to write blocks of code which run within 
+    a subdirectory of this script's directory. The subdirectory is created if it
+    does not exist, and the working directory is restored after completion.
 
     >>> with script_subdirectory("html"):
     ...    output_templates()
@@ -67,10 +71,22 @@ def only_one_process(name=None):
 def venv_run(path, *args):
     '''
     Convenience function for running a python process within the same virtualenv
-    as the caller.
+    as the caller. If relative, the path is relative to this script's directory.
     '''
     with script_directory():
         return Popen([sys.executable, path, *args]).pid
+
+
+def parse_archieml(text):
+    '''
+    Abstract all archieml preprocessing and parsing to this function
+    '''
+    text = text.replace('\r', '')
+    # Obliterate ALL of google's [a][b][c] comment annotations!
+    text = re.sub(r'^\[[a-z]\].+$', '', text, flags=re.M)
+    text = re.sub(r'\[[a-z]\]', '', text)
+    # Undo some of the auto-capitalization google docs inflicts
+    return {k.lower(): v for k,v in archieml.loads(text).items() if v}
 
 
 def mimetype(filename):
@@ -125,10 +141,12 @@ def die(*s):
 
 
 __all__ = [
-    'venv_run',
+    'DEBUG',
     'script_directory', 
     'script_subdirectory', 
     'only_one_process',
+    'venv_run',
+    'parse_archieml',
     'mimetype',
     'slugify', 
     'strip_smartquotes',
