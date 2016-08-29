@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+#encoding: utf-8
+
+import sys
+import json
+import random
+import time
+
+try:
+    import archieml
+    import jinja2
+    import driveclient 
+
+    from utils import *
+    from config import *
+
+    assert len(sys.argv) == 4
+except (ImportError, AssertionError):
+    sys.exit('This tool is meant to be invoked by the API server')
+
+
+# Common
+# ////////////////////////////////////////////////////////////////////////////
+DOC_SUFFIX = ' — READY'
+ARRAY_KEY = 'contributed'
+HEADER = '''
+    <style>
+        * { font-family: "Verdana"; }
+        .markup { font-weight: bold; font-size: 14pt; }
+        .disclaimer { color: #999999; font-size: 9pt; font-style: italic; }
+    </style>
+    <h1>text: {{ title }}</h1>
+    <p class="disclaimer">
+        This document was produced automatically on %s by the beautifulrising.org
+        website. You can make careful changes to the <strong>[%s]</strong> list
+        below, but comments and any other text will be overwritten when it is updated.
+    </p>
+    <p>&nbsp;</p>
+''' % (time.strftime('%B %e, %Y'), ARRAY_KEY)
+
+
+def fruit_salad(string):
+    '''
+    Draw attention to the fact that this document is not "normal" by using
+    randomly colored text. It serves no other practical purpose.
+    '''
+    colors = '4d4d4d 5da5da faa43a 60bd68 f17cb0 b2912f b276b2 decf3f f15854'.split()
+    return ''.join('<span style="color:#{}">{}</span>'.format(random.choice(colors), c)
+                   for i,c in enumerate(string))
+
+
+# ArchieML Output (no one seems to have written a library to produce it!)
+# ////////////////////////////////////////////////////////////////////////////
+def archieml_key_value(key, value):
+    '''
+    Produce an archieml key:value pair with html formatting, preserving multiline strings
+    '''
+    # The text representation contains extra newlines, so replace them in pairs first
+    if '\n' in value:
+        value = value.replace('\n\n', '<br>').replace('\n', '<br>') 
+        value += '<br>:<strong>end</strong>'
+    return jinja2.Template('<strong>{{ key }}</strong>: {{ value }}<br>').render(**vars())
+
+
+def archieml_array(list_of_dicts, key_ordering=[]):
+    '''
+    Produce an archieml array with html formatting
+    '''
+    output = ''
+    for dct in list_of_dicts:
+        output += '<br>'
+        for k in key_ordering:
+            output += archieml_key_value(key=k, value=dct.pop(k, ''))
+        if dct:
+            for k,v in sorted(dct.items()):
+                output += archieml_key_value(key=k, value=v)
+    return ('<span class="markup">[%s]</span>{}<span class="markup">[]</span>' % ARRAY_KEY).format(output)
+
+
+# Intake Handlers
+# ////////////////////////////////////////////////////////////////////////////
+def handle_real_world_example(requirements, form):
+    doc_title = 'Real World Examples'
+    doc_filename = doc_title + DOC_SUFFIX
+
+    # Load the drive doc containing contributed real world examples
+    drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
+    root = drive.folder(DRIVE_ROOT_FOLDER_NAME)
+    folder = root.folder(DRIVE_INTAKE_FOLDER_NAME)
+    file = folder.file(doc_filename)
+
+    # Parse any existing content
+    content = (parse_archieml(file.text) if file else {}).get(ARRAY_KEY, [])
+    content.insert(0, form)
+
+    # Add 'approved' keys to the content for moderation
+    [d.update({'approved': 'no'}) for d in content if 'approved' not in d]
+    requirements.insert(0, 'approved')
+
+    # Prepare the template variables and render the template to the doc
+    title = fruit_salad(doc_title)
+    array = archieml_array(content, requirements)
+    folder.write_html(doc_filename, jinja2.Template(HEADER + array).render(**vars()))
+
+
+
+# When properly invoked, call an appropriate handle_* function
+# ////////////////////////////////////////////////////////////////////////////
+if __name__ == '__main__':
+    with only_one_process('intake'):
+        handler = globals().get('handle_%s' % sys.argv[1].replace('-','_'))
+        if handler and callable(handler):
+            handler(*(json.loads(a) for a in sys.argv[2:]))
+

@@ -122,7 +122,7 @@ def recaptcha_is_valid(timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     features_and_requirements = {
-        'real-world-example': ['document_link', 'slug', 'title', 'link', 'description'],
+        'real-world-example': ['slug', 'title', 'link', 'description', 'document_link'],
         'resource': ['link'],
         'question': [],
     }
