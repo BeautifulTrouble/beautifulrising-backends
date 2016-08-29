@@ -3,6 +3,7 @@ git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
 flask
 flask-restful
 flask-compress
+flask-limiter
 couchdb
 unidecode
 langdetect

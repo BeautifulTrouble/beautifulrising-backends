@@ -10,10 +10,13 @@ import sys
 from urllib.parse import urlparse, unquote
 
 import couchdb
+import requests
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, url_for
-from flask_restful import Resource, Api
 from flask_compress import Compress
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_restful import Resource, Api
 from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
@@ -25,6 +28,7 @@ from config import *
 app = Flask(__name__)
 api = Api(app)
 Compress(app)
+limiter = Limiter(app, key_func=get_remote_address)
 
 
 # CouchDB Setup
@@ -96,21 +100,38 @@ def notify():
                 change_number = str(int(body['id']))
                 venv_run("contentloader", "--change-id", change_number)
 
-    # 204 No Content (success)
-    return ('', 204)
+    return '', 204
 
 
 # Intake
 # ////////////////////////////////////////////////////////////////////////////
-def recaptcha_is_valid():
+def recaptcha_is_valid(timeout=4):
     '''
-    Validate a properly implemented front-end recaptcha form
+    Validate a recaptcha from form data. Always returns True if DEBUG is True.
     '''
-    return requests.post('https://www.google.com/recaptcha/api/siteverify', data={
-        'secret': RECAPTCHA_SITE_SECRET,
-        'response': request.form.get('g-recaptcha-response'),
-        'remoteip': request.remote_addr,
-    }).json().get('success')
+    try:
+        return DEBUG or requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
+            'secret': RECAPTCHA_SITE_SECRET,
+            'response': request.form.get('g-recaptcha-response'),
+            'remoteip': request.remote_addr,
+        }).json().get('success')
+    except requests.RequestException: pass
+
+
+@app.route('/intake/<feature>', methods=['POST'])
+@limiter.limit(API_INTAKE_LIMIT)
+def intake(feature):
+    features_and_requirements = {
+        'real-world-example': ['document_link', 'slug', 'title', 'link', 'description'],
+        'resource': ['link'],
+        'question': [],
+    }
+    if recaptcha_is_valid():
+        requirements = features_and_requirements.get(feature)
+        if requirements is not None and all(request.form.get(item) for item in requirements):
+            venv_run('intakehandler', feature, json.dumps(requirements), json.dumps(request.form))
+            return '', 204
+    return 'Validation failed', 400
 
 
 # Output filtering
@@ -254,6 +275,6 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 # Run when invoked from the command line
 # ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':
-    app.run(port=6000, debug='--debug' in sys.argv)
+    app.run(port=6000, debug=DEBUG)
 
 
