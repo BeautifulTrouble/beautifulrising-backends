@@ -80,7 +80,7 @@ def archieml_array(list_of_dicts, key_ordering=[]):
 
 # Intake Handlers
 # ////////////////////////////////////////////////////////////////////////////
-def handle_real_world_example(requirements, form):
+def handle_real_world_examples(requirements, form):
     doc_title = 'Real World Examples'
     doc_filename = doc_title + DOC_SUFFIX
 
