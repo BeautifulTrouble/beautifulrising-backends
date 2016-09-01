@@ -105,14 +105,14 @@ def notify():
 
 # Intake
 # ////////////////////////////////////////////////////////////////////////////
-def recaptcha_is_valid(timeout=4):
+def recaptcha_is_valid(recaptcha_response, timeout=4):
     '''
     Validate a recaptcha from form data. Always returns True if DEBUG is True.
     '''
     try:
         return DEBUG or requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
             'secret': RECAPTCHA_SITE_SECRET,
-            'response': request.form.get('g-recaptcha-response'),
+            'response': recaptcha-response,
             'remoteip': request.remote_addr,
         }).json().get('success')
     except requests.RequestException: pass
@@ -126,10 +126,11 @@ def intake(feature):
         'resource': ['link'],
         'question': [],
     }
-    if recaptcha_is_valid():
+    body = request.get_json()
+    if recaptcha_is_valid(body.pop('g-recaptcha-response', None)):
         requirements = features_and_requirements.get(feature)
-        if requirements is not None and all(request.form.get(item) for item in requirements):
-            venv_run('intakehandler', feature, json.dumps(requirements), json.dumps(request.form))
+        if requirements is not None and all(body.get(item) for item in requirements):
+            venv_run('intakehandler', feature, json.dumps(requirements), json.dumps(body))
             return '', 204
     return 'Validation failed', 400
 
