@@ -181,7 +181,7 @@ class ContentLoader(object):
                     del content['full-write-up']
                 # Clean up some modules with example tags
                 tags = content.get('tags')
-                if tags and all(t in ['Corruption', 'Mining', 'Gender & Sexuality'] for t in tags):
+                if tags and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
                     del content['tags']
                 # Patch up links between modules
                 for field in self.config['markdown']:
