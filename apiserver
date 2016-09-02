@@ -112,7 +112,7 @@ def recaptcha_is_valid(recaptcha_response, timeout=4):
     try:
         return DEBUG or requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
             'secret': RECAPTCHA_SITE_SECRET,
-            'response': recaptcha-response,
+            'response': recaptcha_response,
             'remoteip': request.remote_addr,
         }).json().get('success')
     except requests.RequestException: pass
