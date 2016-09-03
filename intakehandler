@@ -85,16 +85,16 @@ def handle_real_world_examples(requirements, form):
     # Load the drive doc containing contributed real world examples
     drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
     root = drive.folder(DRIVE_ROOT_FOLDER_NAME)
-    file = root.file(doc_title)
 
     # Parse any existing content
+    file = root.file(doc_title)
     content = (parse_archieml(file.text) if file else {}).get(ARRAY_KEY, [])
     content.insert(0, form)
 
     # Prepare the template variables and render the template to the doc
     title = fruit_salad(doc_title)
     array = archieml_array(content, requirements)
-    file.write_html(jinja2.Template(HEADER + array).render(**vars()))
+    root.write_html(doc_title, jinja2.Template(HEADER + array).render(**vars()))
 
 
 
