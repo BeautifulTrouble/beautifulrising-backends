@@ -21,7 +21,6 @@ except (ImportError, AssertionError):
 
 # Common
 # ////////////////////////////////////////////////////////////////////////////
-DOC_SUFFIX = ' — READY'
 ARRAY_KEY = 'contributed'
 HEADER = '''
     <style>
@@ -82,26 +81,20 @@ def archieml_array(list_of_dicts, key_ordering=[]):
 # ////////////////////////////////////////////////////////////////////////////
 def handle_real_world_examples(requirements, form):
     doc_title = 'Real World Examples'
-    doc_filename = doc_title + DOC_SUFFIX
 
     # Load the drive doc containing contributed real world examples
     drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
     root = drive.folder(DRIVE_ROOT_FOLDER_NAME)
-    folder = root.folder(DRIVE_INTAKE_FOLDER_NAME)
-    file = folder.file(doc_filename)
+    file = root.file(doc_title)
 
     # Parse any existing content
     content = (parse_archieml(file.text) if file else {}).get(ARRAY_KEY, [])
     content.insert(0, form)
 
-    # Add 'approved' keys to the content for moderation
-    [d.update({'approved': 'no'}) for d in content if 'approved' not in d]
-    requirements.insert(0, 'approved')
-
     # Prepare the template variables and render the template to the doc
     title = fruit_salad(doc_title)
     array = archieml_array(content, requirements)
-    folder.write_html(doc_filename, jinja2.Template(HEADER + array).render(**vars()))
+    file.write_html(jinja2.Template(HEADER + array).render(**vars()))
 
 
 
