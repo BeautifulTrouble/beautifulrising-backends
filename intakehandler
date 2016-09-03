@@ -28,7 +28,7 @@ HEADER = '''
         .markup { font-weight: bold; font-size: 18pt; }
         .disclaimer { color: #999999; font-style: italic; }
     </style>
-    <h1>text: {{ title }}</h1>
+    <h1>{{ title }}</h1>
     <p class="disclaimer">
         This document was produced automatically on %s by the beautifulrising.org
         website. You can make careful changes to the <strong>[%s]</strong> list
@@ -90,6 +90,12 @@ def handle_real_world_examples(requirements, form):
     file = root.file(doc_title)
     content = (parse_archieml(file.text) if file else {}).get(ARRAY_KEY, [])
     content.insert(0, form)
+
+    # Link the document_links
+    for entry in content:
+        document_link = entry.get('document_link')
+        if document_link:
+            entry['document_link'] = '<a href="{0}">{0}</a>'.format(document_link)
 
     # Prepare the template variables and render the template to the doc
     title = fruit_salad(doc_title)
