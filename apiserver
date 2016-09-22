@@ -150,7 +150,7 @@ def filter_output(resources, args):
     lang = ((set(language_all) & set(args.get('lang', ()))) or {language_default}).pop()
 
     # Identify the keys which should be hidden from the API
-    hidden_keys = {T['one']: T['hidden'].split() for T in config['types'] if 'hidden' in T}
+    private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
 
     output = []
     for resource in resources:
