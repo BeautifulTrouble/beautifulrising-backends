@@ -96,7 +96,7 @@ def archieml_array(list_of_dicts, key_ordering=[]):
 
 # Intake Handlers
 # ////////////////////////////////////////////////////////////////////////////
-def handle_real_world_examples(requirements, form):
+def handle_real_world_examples(requirements, form, notification_emails):
     doc_title = 'Real World Examples'
 
     # Load the drive doc containing contributed real world examples
@@ -119,7 +119,7 @@ def handle_real_world_examples(requirements, form):
     doc = root.write_html(doc_title, jinja2.Template(HEADER + array).render(**vars()))
 
     # Send email notification of the contribution
-    send_mail(ADMIN_EMAILS, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
+    send_mail(notification_emails, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
 
 
 # When properly invoked, call an appropriate handle_* function

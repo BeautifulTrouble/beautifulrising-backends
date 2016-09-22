@@ -41,7 +41,9 @@ class CouchDocumentAccessor(object):
     def __init__(self, id):
         self.id = id
     def __getitem__(self, item):
-        return db[self.id].get(item, '')
+        return self.get(item)
+    def get(self, item, default=''):
+        return db[self.id].get(item, default)
     def items(self):
         return db[self.id].items()
 config = CouchDocumentAccessor('config:api')
@@ -121,16 +123,21 @@ def recaptcha_is_valid(recaptcha_response, timeout=4):
 @app.route('/intake/<feature>', methods=['POST'])
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
-    features_and_requirements = {
+    feature_requirements = {
         'real-world-examples': ['document_title', 'document_link', 'title', 'link', 'description'],
         'resource': ['link'],
         'question': [],
     }
+    feature_extra = {
+        'real-world-examples': lambda: config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
+    }
     body = request.get_json()
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None)):
-        requirements = features_and_requirements.get(feature)
+        requirements = feature_requirements.get(feature)
         if requirements is not None and all(body.get(item) for item in requirements):
-            venv_run('intakehandler', feature, json.dumps(requirements), json.dumps(body))
+            extra = feature_extra.get(feature, lambda: None)()
+            args = (json.dumps(i) for i in (requirements, body, extra) if i)
+            venv_run('intakehandler', feature, *args)
             return '', 204
     return 'Validation failed', 400
 
