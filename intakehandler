@@ -8,19 +8,36 @@ import time
 
 try:
     import archieml
-    import jinja2
     import driveclient 
+    import jinja2
+    import requests
 
     from utils import *
     from config import *
 
-    assert len(sys.argv) == 4
+    assert len(sys.argv) >= 2
+    assert not set(sys.argv) & {'-h', '--help'}
 except (ImportError, AssertionError):
     sys.exit('This tool is meant to be invoked by the API server')
 
 
 # Common
 # ////////////////////////////////////////////////////////////////////////////
+def get_drive_root():
+    drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
+    return drive.folder(DRIVE_ROOT_FOLDER_NAME)
+
+
+def send_mail(to, subject, text):
+    try:
+        r = requests.post('https://api.mailgun.net/v3/beautifulrising.org/messages',
+            auth=('api', MAILGUN_API_KEY),
+            data={'from': 'Beautiful Rising Web <noreply@beautifulrising.org>',
+                'to': [to], 'subject': subject, 'text': text})
+    except requests.RequestException: r = None
+    return r
+
+
 ARRAY_KEY = 'contributed'
 HEADER = '''
     <style>
@@ -83,8 +100,7 @@ def handle_real_world_examples(requirements, form):
     doc_title = 'Real World Examples'
 
     # Load the drive doc containing contributed real world examples
-    drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
-    root = drive.folder(DRIVE_ROOT_FOLDER_NAME)
+    root = get_drive_root()
 
     # Parse any existing content
     file = root.file(doc_title)
@@ -100,8 +116,10 @@ def handle_real_world_examples(requirements, form):
     # Prepare the template variables and render the template to the doc
     title = fruit_salad(doc_title)
     array = archieml_array(content, requirements)
-    root.write_html(doc_title, jinja2.Template(HEADER + array).render(**vars()))
+    doc = root.write_html(doc_title, jinja2.Template(HEADER + array).render(**vars()))
 
+    # Send email notification of the contribution
+    send_mail(ADMIN_EMAILS, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
 
 
 # When properly invoked, call an appropriate handle_* function
