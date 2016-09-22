@@ -137,17 +137,25 @@ def intake(feature):
 
 # Output filtering
 # ////////////////////////////////////////////////////////////////////////////
-def filter_output(resources, args):
+def filter_output(resources):
     '''
     Filter the output by language, merge x-language keys, and hide keys
     '''
+    # Allow passing in a single resource to get a single resource back
+    single = False
+    if isinstance(resources, dict):
+        single = True
+        resources = [resources]
+
     language_all = config['language-all']
     language_add = config['language-add']
     language_default = config['language-default']
     language_remove = config['language-remove']
 
     # Get one valid language no matter what
-    lang = ((set(language_all) & set(args.get('lang', ()))) or {language_default}).pop()
+    lang = request.args.get('lang')
+    if lang not in language_all:
+        lang = language_default
 
     # Identify the keys which should be hidden from the API
     private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
@@ -169,28 +177,21 @@ def filter_output(resources, args):
         # List available languages
         resource['languages'] = list(translations.keys() | {language_default})
         
-        # Remove hidden keys
-        if 'type' in resource and resource['type'] in hidden_keys:
-            for key in hidden_keys[resource['type']]:
+        # Remove private keys
+        if 'type' in resource and resource['type'] in private_keys:
+            for key in private_keys[resource['type']]:
                 resource.pop(key, None)
+        resource.pop('private', None)
 
         output.append(resource)
-    return output
+
+    # Return an dict or list of dicts as appropriate
+    output = output or [{}]
+    return output[0] if single else output
 
 
 # API Endpoints
 # ////////////////////////////////////////////////////////////////////////////
-def flatten_args(args, sep=','):
-    '''
-    Flatten a werkzeug MultiDict containing duplicate, optionally comma-
-    separated query parameters to a dictionary of lists without duplicates
-        e.g.:     "?name=foo&tags=a,b&tags=c,d&tags=d"
-        becomes:  {'name': ['foo'], 'tags': ['a', 'c', 'b', 'd']}
-    '''
-    return {k: list({i for splitL in (L.split(sep) for L in args.getlist(k)) for i in splitL})
-            for k in args}
-
-
 @app.after_request
 def add_cors_headers(response):
     '''
@@ -210,21 +211,17 @@ for singular_name,plural_name in types.items():
         type = singular_name
         query = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}" % singular_name
         def get(self):
-            args = flatten_args(request.args)
             try:
-                resources = [doc['value'] for doc in db.query(self.query)]
+                return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-            return filter_output(resources, args)
     api.add_resource(Many, '/{API_PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
     class One(Resource):
         type = singular_name
         def get(self, id):
-            args = flatten_args(request.args)
             try:
-                resource = db['{}:{}'.format(self.type, id)]
+                return filter_output(db['{}:{}'.format(self.type, id)])
             except ResourceNotFound: raise NotFound
-            return filter_output([resource], args)[0]
     api.add_resource(One, '/{API_PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
 
 
@@ -236,11 +233,9 @@ for group,types in groups.items():
         types = types
         query = "function(doc){if(%s.indexOf(doc.type)!=-1){emit(doc.slug,doc)}}" % json.dumps(types)
         def get(self):
-            args = flatten_args(request.args)
             try:
-                resources = [doc['value'] for doc in db.query(self.query)]
+                return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-            return filter_output(resources, args)
     api.add_resource(Group, '/{API_PREFIX}/{group}'.format(**vars()), endpoint=group)
 
 
@@ -248,18 +243,16 @@ for group,types in groups.items():
 class All(Resource):
     query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
-        args = flatten_args(request.args)
         try:
-            resources = [doc['value'] for doc in db.query(self.query)]
+            return filter_output([doc['value'] for doc in db.query(self.query)])
         except (KeyError, ResourceNotFound): raise NotFound
-        return filter_output(resources, args)
 api.add_resource(All, '/{API_PREFIX}/all'.format(**vars()), endpoint='all')
 
 
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
-        return {k:v for k,v in config.items()}
+        return filter_output(dict(config.items()))
 api.add_resource(Config, '/{API_PREFIX}/config'.format(**vars()))
 
 
