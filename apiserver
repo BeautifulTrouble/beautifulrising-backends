@@ -61,7 +61,7 @@ def google_verification():
 
 # Drive change notification
 # ////////////////////////////////////////////////////////////////////////////
-@app.route(urlparse(API_NOTIFICATION_URL).path, methods=['POST'])
+@app.route(API_NOTIFICATION_PATH, methods=['POST'])
 def notify():
     '''
     Invoke content loader upon change notification
@@ -221,7 +221,7 @@ for singular_name,plural_name in types.items():
             try:
                 return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Many, '/{API_PREFIX}/{plural_name}'.format(**vars()), endpoint=plural_name)
+    api.add_resource(Many, '{API_PATH}/{plural_name}'.format(**vars()), endpoint=plural_name)
 
     class One(Resource):
         type = singular_name
@@ -229,7 +229,7 @@ for singular_name,plural_name in types.items():
             try:
                 return filter_output(db['{}:{}'.format(self.type, id)])
             except ResourceNotFound: raise NotFound
-    api.add_resource(One, '/{API_PREFIX}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
+    api.add_resource(One, '{API_PATH}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
 
 
 # Get the grouped types and create endpoints
@@ -243,7 +243,7 @@ for group,types in groups.items():
             try:
                 return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Group, '/{API_PREFIX}/{group}'.format(**vars()), endpoint=group)
+    api.add_resource(Group, '{API_PATH}/{group}'.format(**vars()), endpoint=group)
 
 
 # Just emit all the documents
@@ -253,14 +253,14 @@ class All(Resource):
         try:
             return filter_output([doc['value'] for doc in db.query(self.query)])
         except (KeyError, ResourceNotFound): raise NotFound
-api.add_resource(All, '/{API_PREFIX}/all'.format(**vars()), endpoint='all')
+api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
 
 
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
         return filter_output(dict(config.items()))
-api.add_resource(Config, '/{API_PREFIX}/config'.format(**vars()))
+api.add_resource(Config, '{API_PATH}/config'.format(**vars()))
 
 
 # Expose the endpoints themselves
@@ -276,6 +276,6 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 # Run when invoked from the command line
 # ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':
-    app.run(port=6000, debug=DEBUG)
+    app.run(port=7000, debug=DEBUG)
 
 

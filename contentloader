@@ -299,18 +299,19 @@ class ContentLoader(object):
 
     def watch(self):
         '''
-        Request push notifications for entire drive be sent to the API_NOTIFICATION_URL
+        Request push notifications for entire drive be sent to the API_NOTIFICATION_PATH
         '''
+        url = urljoin(API_SERVER, API_NOTIFICATION_PATH)
         now = datetime.utcnow()
         expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
         self.drive.execute(self.drive.service.changes().watch(body={
             'id': '{}-{}'.format(DRIVE_CLIENT_NAME, expiration),
             'type': 'web_hook',
-            'address': API_NOTIFICATION_URL,
+            'address': url,
             'token': API_NOTIFICATION_TOKEN,
             'expiration': expiration,
         }))
-        log("watch: for push notifications at {}".format(API_NOTIFICATION_URL))
+        log("watch: for push notifications at {}".format(url))
     
     
     def unwatch(self):
