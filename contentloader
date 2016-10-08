@@ -205,13 +205,12 @@ class ContentLoader(object):
         return all_content
 
 
-    def find_content(self, item_or_name, item_list, thresh=50, fuzzy_match_cache={}):
+    def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}):
         '''
         Use fuzzy matching to find a content item from a list
         '''
-        item_name = item_or_name
-        if not isinstance(item_or_name, str):
-            item_name = item_or_name['title']
+        if not isinstance(item_name, str):
+            return {}
         cached = fuzzy_match_cache.get(item_name)
         if cached:
             return cached
@@ -487,7 +486,7 @@ class ContentLoader(object):
 
     def fix_relationships(self, all_content):
         '''
-        Replace relationships based on titles with fuzzy-matched slugs
+        Replace relationships based on document titles with fuzzy-matched slugs
         '''
         # Create a mapping between keys and possible content items
         typed = {}
@@ -511,7 +510,7 @@ class ContentLoader(object):
                     if key_referring_to_this_type:
                         for other in found_content.values():
                             other_list = other.get(key_referring_to_this_type, [])
-                            other[key_referring_to_this_type] = sorted(this_slug | set(other_list))
+                            other[key_referring_to_this_type] = sorted(this_slug | {i for i in other_list if isinstance(i, str)})
         return all_content
 
 
