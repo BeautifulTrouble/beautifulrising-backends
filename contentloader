@@ -208,6 +208,7 @@ class ContentLoader(object):
     def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}):
         '''
         Use fuzzy matching to find a content item from a list
+        This should always return a dict
         '''
         if not isinstance(item_name, str):
             return {}
@@ -264,8 +265,6 @@ class ContentLoader(object):
         # Manage single keys which contain lists
         c.setdefault('plural-separator-regex', r'(?:\s*,|\s+and|\s+&)\s+')
         c.setdefault('plural-keys', {})
-        # Relationships between content items
-        c.setdefault('relationships', {})
         # Fields which should be parsed with markdown parser
         c.setdefault('markdown', [])
         c.setdefault('xref-link-pattern', '/tool/%s')
@@ -281,6 +280,13 @@ class ContentLoader(object):
         for key,value in c.items():
             if key.startswith('types-'):
                 c['types'] += value
+        # Relationships between content items are specified as pairs of one-way fields and groups of pairs of two-way fields
+        c['relationships'] = {'forward': {}, 'backward': []}
+        for key,value in c.items():
+            if key.startswith('one-way') or key.startswith('two-way'):
+                c['relationships']['forward'].update(value)
+            if key.startswith('two-way'):
+                c['relationships']['backward'].append(value)
 
         # Save the config before creating lots of temporary language-related data within it
         c.update(type='config', slug='api')
@@ -488,29 +494,60 @@ class ContentLoader(object):
         '''
         Replace relationships based on document titles with fuzzy-matched slugs
         '''
-        # Create a mapping between keys and possible content items
-        typed = {}
+        typed_content = {}
+        slugged_content = {}
         for content in all_content:
-            typed.setdefault(content['type'], []).append(content)
+            typed_content.setdefault(content['type'], []).append(content)
+            slugged_content[content['slug']] = content
 
-        relationships = self.config['relationships']
-        keys_and_choices = {k: typed.get(v, []) for k,v in relationships.items()}
-        types_and_keys = {v: k for k,v in relationships.items()}
-
-        # Fuzzy match and slugify related content items
+        # Forward relationships are specified with a mapping of fields to types. Simply replace titles with 
+        # fuzzy-matched slugs, eliminate invalid entries, and remove empty fields.
+        forward = self.config['relationships']['forward']
         for content in all_content:
-            this_slug = {content['slug']}
-            key_referring_to_this_type = types_and_keys.get(content['type'])
-            for key,choices in keys_and_choices.items():
-                if key in content:
-                    found_content = {c['slug']: c for c in (self.find_content(t, choices, 90)
-                                                            for t in content[key]) if c}
-                    content[key] = sorted(found_content)
-                    # If anything else relates to this object's type, make relationships bi-directional
-                    if key_referring_to_this_type:
-                        for other in found_content.values():
-                            other_list = other.get(key_referring_to_this_type, [])
-                            other[key_referring_to_this_type] = sorted(this_slug | {i for i in other_list if isinstance(i, str)})
+            for field,doc_type in forward.items():
+                related_titles = content.get(field)
+                if related_titles is not None:
+                    possibly_related_docs = typed_content.get(doc_type, [])
+                    if isinstance(related_titles, list):
+                        content[field] = sorted(c['slug'] for c in 
+                            (slugged_content.get(t) or self.find_content(t, possibly_related_docs, 90)
+                                                                    for t in related_titles) if c)
+                    elif isinstance(related_titles, str):
+                        content[field] = self.find_content(related_titles, possibly_related_docs, 90).get('slug')
+                    if not content[field]:
+                        del content[field]
+
+        # Backward relationships ensure that groups of interrelated content are linked in both directions,
+        # even when related content is only specified going one way. Each group of backward relationships 
+        # specifies two things:
+        #   1. The fields containing forward relationships so that forward related docs can be found
+        #   2. A mapping of types to the fields which, in those related docs, need to be related back
+        backward_groups = [(g.keys(), {v: k for k,v in g.items()}) for g in self.config['relationships']['backward']]
+        for content in all_content:
+            slug = content['slug']
+            # Each of these ([field, ...], {type:field}) pairs represents a group of interrelated content
+            for fields,types_to_fields in backward_groups:
+                # Field relating back to this type
+                field_back = types_to_fields.get(content['type'])
+                if field_back:
+                    # Iterate through everything ~this~ doc relates to and get those docs
+                    related_docs = []
+                    for field in fields:
+                        related_slugs = content.get(field)
+                        if related_slugs:
+                            if isinstance(related_slugs, str):
+                                related_slugs = [related_slugs]
+                            if isinstance(related_slugs, list):
+                                related_docs.extend([*filter(None, (slugged_content.get(s) for s in related_slugs))])
+                    # Now add the backward relationship to every doc
+                    for doc in related_docs:
+                        backward_field = doc.get(field_back)
+                        if isinstance(backward_field, str):
+                            doc[field_back] = slug
+                        elif backward_field is None:
+                            doc[field_back] = [slug]
+                        elif isinstance(backward_field, list):
+                            doc[field_back] = list({slug} | set(backward_field))
         return all_content
 
 
