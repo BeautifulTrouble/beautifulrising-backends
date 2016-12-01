@@ -7,7 +7,7 @@ flask-limiter
 couchdb
 unidecode
 langdetect
-fuzzywuzzy
+fuzzywuzzy<0.13.0
 python-Levenshtein
 python-magic
 requests

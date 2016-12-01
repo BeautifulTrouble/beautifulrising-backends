@@ -282,6 +282,9 @@ class ContentLoader(object):
         for key,value in c.items():
             if key.startswith('types-'):
                 c['types'] += value
+        c['types-plural-names'] = {T['one']: T['many'] for T in c['types']}
+        c['types-singular-names'] = {T['many']: T['one'] for T in c['types']}
+
         # Relationships between content items are specified as pairs of one-way fields and groups of pairs of two-way fields
         c['relationships'] = {'forward': {}, 'backward': []}
         for key,value in c.items():
