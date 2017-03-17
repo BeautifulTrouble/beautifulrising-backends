@@ -127,7 +127,7 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)[\s)]+\)?').search
+        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http).+)\)').search
         xrefpat = self.config['xref-link-pattern']
         language_default = self.config['language-default']
 
