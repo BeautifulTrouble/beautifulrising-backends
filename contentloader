@@ -139,7 +139,6 @@ class ContentLoader(object):
                 content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
-                        link_text = nest_parens(link_text, 1)
                         replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
                     else:
                         link_text = nest_parens(content['title'], 1)
