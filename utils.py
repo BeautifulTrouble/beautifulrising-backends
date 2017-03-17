@@ -104,6 +104,24 @@ def slugify(s, allow=''):
     return re.sub(r'[^\w{}]+'.format(allow), '-', s)
 
 
+def nest_parens(text, level=0):
+    '''
+    Typographically adjust parens such that parens within parens become
+    alternating brackets and parens. Use a level argument to move all nested
+    parens "down a level" (e.g.: "(hello [world])" --> "[hello (world)]")
+    '''
+    adjusted = []
+    for c in text:
+        if c in '([':
+            c = '(['[level%2]
+            level += 1
+        elif c in '])':
+            c = '])'[level%2]
+            level -= 1
+        adjusted.append(c)
+    return ''.join(adjusted)
+
+
 def strip_smartquotes(s):
     '''
     For code mangled by a word processor
@@ -149,6 +167,7 @@ __all__ = [
     'parse_archieml',
     'mimetype',
     'slugify', 
+    'nest_parens',
     'strip_smartquotes',
     'log', 
     'warn',

@@ -127,7 +127,7 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)').search
+        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)[\s)]+\)').search
         xrefpat = self.config['xref-link-pattern']
         language_default = self.config['language-default']
 
@@ -135,12 +135,15 @@ class ContentLoader(object):
             m, chunks = matcher(text), []
             while m:
                 link_text, module_name, _, end = *m.groups(), *m.span()
+                # TODO: ensure this gets the right language, even on a fresh load
                 content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
+                        link_text = nest_parens(link_text, 1)
                         replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
                     else:
-                        replacement = '(see: [%s: %s]({}))'.format(xrefpat) % (content['type'].upper(), content['title'], content['slug'])
+                        link_text = nest_parens(content['title'], 1)
+                        replacement = '(see: [%s: %s]({}))'.format(xrefpat) % (content['type'].upper(), link_text, content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 else:
                     #TODO: do something clever when a x-refed module is missing?
