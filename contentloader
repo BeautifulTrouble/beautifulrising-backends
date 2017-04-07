@@ -566,9 +566,10 @@ class ContentLoader(object):
                 if related_titles is not None:
                     possibly_related_docs = typed_content.get(doc_type, [])
                     if isinstance(related_titles, list):
-                        content[field] = sorted(c['slug'] for c in 
+                        # Ignore leading hyphens when sorting (Is this sort redundant? Prove it before removing!)
+                        content[field] = sorted((c['slug'] for c in
                             (slugged_content.get(t) or self.find_content(t, possibly_related_docs, 90)
-                                                                    for t in related_titles) if c)
+                             for t in related_titles) if c), key=lambda s: s.lstrip('-'))
                     elif isinstance(related_titles, str):
                         content[field] = self.find_content(related_titles, possibly_related_docs, 90).get('slug')
                     if not content[field]:
@@ -604,7 +605,8 @@ class ContentLoader(object):
                         elif backward_field is None:
                             doc[field_back] = [slug]
                         elif isinstance(backward_field, list):
-                            doc[field_back] = list({slug} | set(backward_field))
+                            # Ignore leading hyphens when sorting
+                            doc[field_back] = sorted({slug} | set(backward_field), key=lambda s: s.lstrip('-'))
         return all_content
 
 
