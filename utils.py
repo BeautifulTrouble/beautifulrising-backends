@@ -131,19 +131,33 @@ def strip_smartquotes(s):
     return reduce(replace, pairs, s)
 
 
-def log(*s, fatal=False, tty=sys.stdout.isatty(), color='32', **kw): 
+def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
     '''
     Tee-style logging with timestamps
     '''
+    # Support foreground colors specified by name or ANSI escape number
+    colors = dict(zip('red green yellow blue magenta cyan white'.split(), range(31,38)))
+    colors.update({str(v):v for k,v in colors.items()})
+    color = colors[str(color).lower()]
+
+    # Select color or plain logging depending on terminal type
     logfmt = ('\x1b[30m[\x1b[{}m{{:^10}}\x1b[30m]\x1b[0m'.format(color) if tty else '[{:^10}]').format
+
+    # Format and colorize special messages (those with a colon after the first word)
     if ':' in s[0]:
         head, tail = s[0].split(':', maxsplit=1)
         s = [logfmt(head), tail, *s[1:]]
     s = ' '.join(map(str, s))
+
+    # Log to file
     script_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(script_dir, 'log.txt'), 'a', encoding="utf-8") as file:
         file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
+
+    # Log to terminal
     print(s, **kw)
+
+    # Exit
     if fatal:
         print('Quitting.')
         sys.exit(int(fatal))
