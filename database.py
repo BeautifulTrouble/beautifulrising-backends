@@ -1,10 +1,14 @@
 #encoding: utf-8
 
 import copy
+import warnings
 
 import couchdb
 
 from utils import log
+
+
+warnings.simplefilter('once', PendingDeprecationWarning)
 
 
 class DatabaseConnector(object):
@@ -42,7 +46,17 @@ class DatabaseConnector(object):
         confirm = input('Delete the database "{}" [y/N]? '.format(self.database_name))
         if confirm.lower() == 'y' and self.database_name in self.server:
             del self.server[self.database_name]
-            log('deleted:', self.database_name, color=31)
+            log('deleted:', self.database_name, color='red')
+
+
+    def query(self, querystring):
+        '''
+        CouchDB 2.x no longer supports temporary views as used by
+        DatabaseConnector.query, so future database upgrades will break on this
+        call.
+        '''
+        warnings.warn(self.query.__doc__, PendingDeprecationWarning, stacklevel=2)
+        return [doc['value'] for doc in self.db.query(querystring)]
 
 
     def save(self, *objects, now=False):
@@ -65,7 +79,7 @@ class DatabaseConnector(object):
             retry_queue = []
 
             for success,id,rev_or_exc in self.db.update(self.write_queue):
-                log('saved:', id) if success else log('updating:', id, color=33)
+                log('saved:', id) if success else log('updating:', id, color='yellow')
 
                 # Enqueue conflicting (existing) objects for a retry save
                 if isinstance(rev_or_exc, couchdb.http.ResourceConflict):
@@ -77,7 +91,7 @@ class DatabaseConnector(object):
 
             if retry_queue:
                 for success,id,rev_or_exc in self.db.update(retry_queue):
-                    log('saved:', id) if success else log('lost:', id, color=31)
+                    log('saved:', id) if success else log('lost:', id, color='red')
 
             self.write_queue.clear()
 
