@@ -127,7 +127,7 @@ def strip_smartquotes(s):
     For code mangled by a word processor
     '''
     pairs = '\u201c"', '\u201d"', "\u2018'", "\u2019'"
-    replace = lambda s,r: s.replace(*r)
+    replace = lambda s, r: s.replace(*r)
     return reduce(replace, pairs, s)
 
 
@@ -162,7 +162,7 @@ def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
         print('Quitting.')
         sys.exit(int(fatal))
 
-warn = lambda *s,fatal=False,color='33',**kw: log(*s, fatal=fatal, color=color, **kw)
+warn = lambda *s, fatal=False, color='red', **kw: log(*s, fatal=fatal, color=color, **kw)
 
 
 def die(*s):
