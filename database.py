@@ -24,20 +24,31 @@ import warnings
 
 import couchdb
 
-from utils import log, warn
+from utils import DEBUG, log, warn
 
 from config import (
     DB_NAME,
     DB_SERVER,
 )
 
+if DEBUG:
+    DB_NAME = DB_NAME + '_testing'
+
 
 warnings.simplefilter('once', PendingDeprecationWarning)
 
 
-# Stable hash of a dictionary's items (used for naming views)
 def hashobj(obj):
-    string = '{}{}'.format(sorted(obj.keys()), sorted(obj.values())).encode()
+    '''
+    Produces a stable hash of a dictionary's items. This is used when naming
+    and looking up automatically-generated views for queries
+    '''
+    keys = sorted(obj.keys())
+    # Support one level of embedded lists so that these produce a stable hash: 
+    #   {'type': ['thIs', 'thAt']}
+    #   {'type': ('thAt', 'thIs')}
+    values = sorted(str(sorted(v) if isinstance(v, (list, tuple)) else v) for v in obj.values())
+    string = '{}{}'.format(keys, values).encode()
     return hashlib.md5(string).hexdigest()
 
 
@@ -51,7 +62,7 @@ class DatabaseConnector(object):
     '''
     def __init__(self):
         self.server_address = DB_SERVER
-        self.database_name = DB_NAME + '_testing'
+        self.database_name = DB_NAME
 
         # A write queue is used for lazy persistence
         self.write_queue = []
@@ -61,37 +72,45 @@ class DatabaseConnector(object):
         self.get_or_create_database()
 
 
-    def _get_view(self, mapping, regex):
+    def _get_view(self, mapping, query_type):
         '''
         Query a view and return documents. This method will create the relevant
         view by calling DatabaseConnector._make_view if needed.
         '''
-        view = ('by_regex/' if regex else 'by_exact/') + hashobj(mapping)
+        view = query_type + '/' + hashobj(mapping)
         try:
             results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view)])
         except couchdb.http.ResourceNotFound:
-            self._make_view(mapping, regex)
+            self._make_view(mapping, query_type)
             results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view)])
         return results
 
 
-    def _make_view(self, mapping, regex):
+    def _make_view(self, mapping, query_type):
         '''
         Creates a view for every query used by constructing a js function
         '''
+        ddoc_name = '_design/' + query_type
         mapping_hash = hashobj(mapping)
 
-        # Create a javascript condition string by &&-joining an appropriate
-        # fragment. If regex isn't specified, use exact matching
-        if regex:
-            ddoc_name = '_design/by_regex'
+        # Create a javascript condition string by joining an appropriate fragment
+        clauses = []
+        if query_type == 'regex':
             fragment = r'''/{regex}/.test(doc['{prop}'] || '')'''
-            condition = ' && '.join(fragment.format(**vars()) for prop,regex in mapping.items())
+            for prop, match in mapping.items():
+                if isinstance(match, (list, tuple)):
+                    clauses.append('({})'.format(' || '.join(fragment.format(prop=prop, regex=regex) for regex in match)))
+                else:
+                    clauses.append(fragment.format(prop=prop, regex=match))
         else:
-            ddoc_name = '_design/by_exact'
-            fragment = r'''{string} == doc['{prop}']'''
-            condition = ' && '.join(fragment.format(prop=prop, string=json.dumps(string))
-                                    for prop,string in mapping.items())
+            fragment = r'''doc['{prop}'] == {string}'''
+            for prop, match in mapping.items():
+                if isinstance(match, (list, tuple)):
+                    clauses.append('({})'.format(' || '.join(fragment.format(prop=prop, string=json.dumps(string)) for string in match)))
+                else:
+                    clauses.append(fragment.format(prop=prop, string=json.dumps(match)))
+
+        condition = ' && '.join(clauses)
 
         mapfun = textwrap.dedent(r'''
             function(doc) {
@@ -101,6 +120,7 @@ class DatabaseConnector(object):
             }
         '''.strip('\n')) % condition
 
+        print(mapfun)
         ddoc = self.db.get(ddoc_name)
         if ddoc:
             ddoc['views'][mapping_hash] = {'map': mapfun}
@@ -119,19 +139,39 @@ class DatabaseConnector(object):
         warnings.warn(self.query.__doc__, PendingDeprecationWarning, stacklevel=4)
         return [doc['value'] for doc in self.db.query(mapfunction)]
 
+    
+    def query(self, **mapping):
+        '''
+        Specify a mapping of fields to exact matches where those matches can
+        be either strings or lists of OR-joined possible string matches.
+        '''
+        return self._get_view(mapping, 'exact')
 
-    def exact_query(self, **mapping):
+
+    def query_one(self, **mapping):
         '''
-        Return matching docs for given key_names='exact_values'
+        Same as DatabaseConnector.query, but returns only the first result
         '''
-        return self._get_view(mapping, regex=False)
+        results = self._get_view(mapping, 'exact')
+        if results:
+            return results[0]
+    
+
+    def query_regex(self, **mapping):
+        '''
+        Specify a mapping of fields to regex matches where those matches can
+        be either string regexes or lists of OR-joined possible regex matches.
+        '''
+        return self._get_view(mapping, 'regex')
 
 
-    def regex_query(self, **mapping):
+    def query_regex_one(self, **mapping):
         '''
-        Return matching docs for given key_names='^regular_expressions$'
+        Same as DatabaseConnector.query_regex, but returns only the first result
         '''
-        return self._get_view(mapping, regex=True)
+        results = self._get_view(mapping, 'regex')
+        if results:
+            return results[0]
 
 
     def save(self, *objects, now=False):
@@ -209,28 +249,22 @@ class DatabaseDocumentQueryset(collections.UserList):
             DatabaseDocumentQueryset(type="methodology")
     '''
     def __init__(self, *a, **kw):
+        documents = []
+
         if a and isinstance(a[0], list):
             # If a list is passed, it will be interpreted as a request to wrap
             # it in the DatabaseDocumentQueryset type
-            documents = a[0]
+            documents = [DatabaseDocument(d) for d in a[0]]
 
-        elif a and isinstance(a[0], str):
-            # If a string is passed, it will be interpreted to be a regex
-            # query on couch document ids
-            documents = DatabaseConnector.regex_query(_id=a[0])
-            documents.extend(a[1:])
-
-        elif kw:
-            # If keyword arguments are used, they will be interpreted as
-            # a mapping of exact mactches
-            documents = DatabaseConnector.exact_query(**kw)
-
-        documents = [DatabaseDocument(d) for d in documents]
         super().__init__(documents)
 
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, list(self))
+
+
+    def _json(self):
+        return self.data
 
 
     def save(self, now=True):
@@ -240,15 +274,5 @@ class DatabaseDocumentQueryset(collections.UserList):
         for d in self:
             d.save()
         DatabaseConnector.save(now)
-
-
-    @staticmethod
-    def exact_query(**mapping):
-        return DatabaseConnector.exact_query(**mapping)
-
-
-    @staticmethod
-    def regex_query(**mapping):
-        return DatabaseConnector.regex_query(**mapping)
 
 

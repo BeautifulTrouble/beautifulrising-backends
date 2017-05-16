@@ -2,6 +2,7 @@
 import contextlib
 import datetime
 import fcntl
+import json
 import os
 import re
 import sys
@@ -14,6 +15,17 @@ import unidecode
 
 
 DEBUG = '--debug' in sys.argv
+
+
+class JSONEncoder(json.JSONEncoder):
+    '''
+    JSON encoder which invokes magic _json method on custom classes
+    '''
+    def default(self, obj):
+        try:
+            return obj._json()
+        except AttributeError:
+            return json.JSONEncoder.default(self, obj)
 
 
 @contextlib.contextmanager
@@ -174,6 +186,7 @@ def die(*s):
 
 __all__ = [
     'DEBUG',
+    'JSONEncoder',
     'script_directory', 
     'script_subdirectory', 
     'only_one_process',
