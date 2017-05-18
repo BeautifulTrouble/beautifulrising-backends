@@ -114,7 +114,7 @@ class DatabaseConnector(object):
         map_function = textwrap.dedent(r'''
             function(doc) {
                 if (%s) {
-                    emit(doc.document_id, doc);
+                    emit(doc._id);
                 }
             }
         '''.strip('\n')) % condition
@@ -167,7 +167,7 @@ class DatabaseConnector(object):
         DatabaseConnector.mapfunction_query, so this call may not work.
         '''
         warnings.warn(self.query.__doc__, PendingDeprecationWarning, stacklevel=4)
-        return [doc['value'] for doc in self.db.query(mapfunction)]
+        return [row['doc'] for row in self.db.query(mapfunction, include_docs=True)]
 
     
     def query(self, **mapping):
@@ -210,7 +210,7 @@ class DatabaseConnector(object):
         check for an empty result, indicating the view may not exist.
         '''
         try:
-            results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view_name)])
+            results = DatabaseDocumentQueryset([row['doc'] for row in self.db.view(view_name, include_docs=True)])
         except couchdb.http.ResourceNotFound:
             results = DatabaseDocumentQueryset()
         return results
@@ -231,6 +231,10 @@ class DatabaseConnector(object):
         # Real persistence
         if now or not objects:
             retry_queue = []
+
+            # Force document ids to follow the scheme slug:type:document_id
+            for document in self.write_queue:
+                document['_id'] = ':'.join(document.get(k,'') for k in ('slug', 'type', 'document_id'))
 
             for success,id,rev_or_exc in self.db.update(self.write_queue):
                 log('saved:', id) if success else warn('updating:', id, color='yellow')
@@ -279,8 +283,7 @@ class DatabaseDocument(collections.OrderedDict):
         super().__init__(*a, **kw)
 
 
-    def save(self, now=False):
-        self['_id'] = ':'.join(self.get(k,'') for k in ('slug', 'type', 'document_id'))
+    def save(self, now=True):
         DatabaseConnector.save(self, now=now)
 
 
@@ -314,7 +317,7 @@ class DatabaseDocumentQueryset(collections.UserList):
         Save a queryset immediately
         '''
         for d in self:
-            d.save()
+            d.save(now=False)
         DatabaseConnector.save(now)
 
 
