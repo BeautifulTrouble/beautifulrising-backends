@@ -21,19 +21,17 @@ import hashlib
 import json
 import textwrap
 import warnings
+from urllib.parse import urljoin
 
 import couchdb
+import requests
 
-from utils import DEBUG, log, warn
+from utils import log, warn
 
 from config import (
     DB_NAME,
     DB_SERVER,
 )
-
-
-if DEBUG:
-    DB_NAME = DB_NAME + '_testing'
 
 
 warnings.simplefilter('once', PendingDeprecationWarning)
@@ -76,6 +74,11 @@ class DatabaseConnector(object):
         # Connect
         self.server = couchdb.Server(self.server_address)
         self.get_or_create_database()
+        log('couchdb: connected to database "{}"'.format(DB_NAME))
+
+        # Cap revision limit since docs are so frequently updated
+        requests.put(urljoin(DB_SERVER, DB_NAME + '/_revs_limit'), data='10').status_code
+        log('couchdb: capping document revision limit at 10')
 
 
     def _create_map_function(self, mapping, query_type='exact'):
@@ -251,9 +254,11 @@ class DatabaseConnector(object):
         '''
         Get or create database as needed
         '''
-        if self.database_name not in self.server:
+        try:
+            self.db = self.server[self.database_name]
+        except couchdb.http.ServerError:
             self.server.create(self.database_name)
-        self.db = self.server[self.database_name]
+            self.db = self.server[self.database_name]
         return self.db
 
 
