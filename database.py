@@ -4,14 +4,14 @@
 This module provides convenience classes to query and modify a single CouchDB
 database as specified in config.py. Basic usage looks like this:
 
-    methodologies = DatabaseDocumentQueryset(type='methodology')
+    methodologies = DatabaseConnector.query(type='methodology')
     methodologies[0]['new_key'] = 'value'
     methodologies.save()
 
 It's not meant to be fancy like an ORM, but basic combinatorial queries work:
 
-    lonely_planets = DatabaseDocumentQueryset(type='planet', mood='lonely')
-    americans = DatabaseDocumentQueryset.regex_query(type='^person$', name='^.{4}$')
+    lonely_planets = DatabaseConnector.query(type='planet', mood='lonely')
+    americans = DatabaseConnector.query_regex(type='^person$', name='^.{4}$')
 '''
 
 
@@ -31,6 +31,7 @@ from config import (
     DB_SERVER,
 )
 
+
 if DEBUG:
     DB_NAME = DB_NAME + '_testing'
 
@@ -43,6 +44,10 @@ def hashobj(obj):
     Produces a stable hash of a dictionary's items. This is used when naming
     and looking up automatically-generated views for queries
     '''
+    # Support objects which aren't dictionaries, but stability isn't guaranteed
+    if not isinstance(obj, dict):
+        obj = {str(obj): None}
+
     keys = sorted(obj.keys())
     # Support one level of embedded lists so that these produce a stable hash: 
     #   {'type': ['thIs', 'thAt']}
@@ -54,6 +59,7 @@ def hashobj(obj):
 
 # We only need one DatabaseConnector object, so we may as well insantiate it
 staticclass = lambda cls: cls()
+
 
 @staticclass
 class DatabaseConnector(object):
@@ -72,47 +78,37 @@ class DatabaseConnector(object):
         self.get_or_create_database()
 
 
-    def _get_view(self, mapping, query_type):
+    def _create_map_function(self, mapping, query_type='exact'):
         '''
-        Query a view and return documents. This method will create the relevant
-        view by calling DatabaseConnector._make_view if needed.
-        '''
-        view = query_type + '/' + hashobj(mapping)
-        try:
-            results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view)])
-        except couchdb.http.ResourceNotFound:
-            self._make_view(mapping, query_type)
-            results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view)])
-        return results
+        Constructs a javascript map function for simple combinatoric queries.
+        The queries are structured as an AND-joined sequence of OR-joined
+        matches using either regex or exact string matching on document fields.
 
+        An example mapping for a regex query might look like:
 
-    def _make_view(self, mapping, query_type):
-        '''
-        Creates a view for every query used by constructing a js function
-        '''
-        ddoc_name = '_design/' + query_type
-        mapping_hash = hashobj(mapping)
+            {'type': 'person', 'last_name': ['s[eo]n$', 'strom$']}
 
+        ...and would construct a view function to match docs with types person
+        or salesperson containing last names like Anderson, Andersen & Bergstrom
+        '''
         # Create a javascript condition string by joining an appropriate fragment
-        clauses = []
         if query_type == 'regex':
-            fragment = r'''/{regex}/.test(doc['{prop}'] || '')'''
-            for prop, match in mapping.items():
-                if isinstance(match, (list, tuple)):
-                    clauses.append('({})'.format(' || '.join(fragment.format(prop=prop, regex=regex) for regex in match)))
-                else:
-                    clauses.append(fragment.format(prop=prop, regex=match))
+            fragment = '''/{string}/.test(doc['{field}'] || '')'''
+            string_func = str
         else:
-            fragment = r'''doc['{prop}'] == {string}'''
-            for prop, match in mapping.items():
-                if isinstance(match, (list, tuple)):
-                    clauses.append('({})'.format(' || '.join(fragment.format(prop=prop, string=json.dumps(string)) for string in match)))
-                else:
-                    clauses.append(fragment.format(prop=prop, string=json.dumps(match)))
+            fragment = '''doc['{field}'] == {string}'''
+            string_func = json.dumps
 
+        clauses = []
+        for field, match in mapping.items():
+            if isinstance(match, (list, tuple)):
+                fragments = (fragment.format(field=field, string=string_func(s)) for s in match)
+                clauses.append('({})'.format(' || '.join(fragments)))
+            else:
+                clauses.append(fragment.format(field=field, string=string_func(match)))
         condition = ' && '.join(clauses)
 
-        mapfun = textwrap.dedent(r'''
+        map_function = textwrap.dedent(r'''
             function(doc) {
                 if (%s) {
                     emit(doc.document_id, doc);
@@ -120,21 +116,52 @@ class DatabaseConnector(object):
             }
         '''.strip('\n')) % condition
 
-        print(mapfun)
+        return map_function
+
+
+    def _get_or_create_view(self, mapping, query_type):
+        '''
+        Query a view and return documents. This method will create the relevant
+        view by calling DatabaseConnector.create_view if needed.
+        '''
+        view_name = query_type + '/' + hashobj(mapping)
+
+        results = self.view(view_name)
+        if not results:
+            self.create_view(self._create_map_function(mapping, query_type), view_name)
+            results = self.view(view_name)
+
+        return results
+
+
+    def create_view(self, map_function, view_name=None):
+        '''
+        Produce a custom view from a map function and return that view's name
+        for use with DatabaseConnector.view
+        '''
+        if view_name is None:
+            view_name = 'custom/' + hashobj(map_function)
+
+        # The full view name is the name of a design document, a slash & a view
+        ddoc_name, view = view_name.split('/', maxsplit=1)
+        ddoc_name = '_design/' + ddoc_name
+
+        # Ensure the design document exists and create the view
         ddoc = self.db.get(ddoc_name)
         if ddoc:
-            ddoc['views'][mapping_hash] = {'map': mapfun}
+            ddoc['views'][view] = {'map': map_function}
         else:
-            ddoc = {'views': {mapping_hash: {'map': mapfun}}}
+            ddoc = {'views': {view: {'map': map_function}}}
         ddoc['_id'] = ddoc_name
         self.save(ddoc, now=True)
+
+        return view_name
 
 
     def mapfunction_query(self, mapfunction):
         '''
         CouchDB 2.x no longer supports temporary views as used by
-        DatabaseConnector.mapfunction_query, so future database upgrades will
-        break on this call.
+        DatabaseConnector.mapfunction_query, so this call may not work.
         '''
         warnings.warn(self.query.__doc__, PendingDeprecationWarning, stacklevel=4)
         return [doc['value'] for doc in self.db.query(mapfunction)]
@@ -145,14 +172,14 @@ class DatabaseConnector(object):
         Specify a mapping of fields to exact matches where those matches can
         be either strings or lists of OR-joined possible string matches.
         '''
-        return self._get_view(mapping, 'exact')
+        return self._get_or_create_view(mapping, 'exact')
 
 
     def query_one(self, **mapping):
         '''
         Same as DatabaseConnector.query, but returns only the first result
         '''
-        results = self._get_view(mapping, 'exact')
+        results = self._get_or_create_view(mapping, 'exact')
         if results:
             return results[0]
     
@@ -162,16 +189,28 @@ class DatabaseConnector(object):
         Specify a mapping of fields to regex matches where those matches can
         be either string regexes or lists of OR-joined possible regex matches.
         '''
-        return self._get_view(mapping, 'regex')
+        return self._get_or_create_view(mapping, 'regex')
 
 
     def query_regex_one(self, **mapping):
         '''
         Same as DatabaseConnector.query_regex, but returns only the first result
         '''
-        results = self._get_view(mapping, 'regex')
+        results = self._get_or_create_view(mapping, 'regex')
         if results:
             return results[0]
+
+
+    def view(self, view_name):
+        '''
+        Produce a DatabaseDocumentQueryset from a given view. Callers should
+        check for an empty result, indicating the view may not exist.
+        '''
+        try:
+            results = DatabaseDocumentQueryset([row['value'] for row in self.db.view(view_name)])
+        except couchdb.http.ResourceNotFound:
+            results = DatabaseDocumentQueryset()
+        return results
 
 
     def save(self, *objects, now=False):
@@ -180,7 +219,7 @@ class DatabaseConnector(object):
         the save will take place immediately.
         '''
         # Freeze contents so mutable data doesn't change before actual write
-        # XXX: Vet this assumption
+        # XXX: Vet this assumption about copies
         objects = [copy.deepcopy(obj) for obj in objects]
 
         # Enqueue the objects for saving
@@ -203,7 +242,6 @@ class DatabaseConnector(object):
 
             if retry_queue:
                 for success, id, rev_or_exc in self.db.update(retry_queue):
-                    print(success, id, rev_or_exc)
                     log('saved:', id) if success else warn('lost:', id)
 
             self.write_queue.clear()
@@ -229,6 +267,8 @@ class DatabaseConnector(object):
             warn('deleted:', self.database_name)
 
 
+
+
 class DatabaseDocument(collections.OrderedDict):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
@@ -239,14 +279,11 @@ class DatabaseDocument(collections.OrderedDict):
         DatabaseConnector.save(self, now=now)
 
 
+
+
 class DatabaseDocumentQueryset(collections.UserList):
     '''
-    Simple query abstraction handles two major relevant use cases:
-
-        1. Regex lookup on document IDs when a string is passed
-            DatabaseDocumentQueryset("flash-mob")
-        2. Key/Value matching on documents when keys are passed
-            DatabaseDocumentQueryset(type="methodology")
+    Simple container for a collection of DatabaseDocument objects
     '''
     def __init__(self, *a, **kw):
         documents = []
