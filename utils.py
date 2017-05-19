@@ -15,6 +15,7 @@ import unidecode
 
 
 DEBUG = '--debug' in sys.argv
+DEVELOP = '--develop' in sys.argv
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -186,6 +187,7 @@ def die(*s):
 
 __all__ = [
     'DEBUG',
+    'DEVELOP',
     'JSONEncoder',
     'script_directory', 
     'script_subdirectory', 
