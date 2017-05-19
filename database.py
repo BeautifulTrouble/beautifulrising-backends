@@ -206,13 +206,13 @@ class DatabaseConnector(object):
 
     def view(self, view_name):
         '''
-        Produce a DatabaseDocumentQueryset from a given view. Callers should
+        Produce a DatabaseDocumentCollection from a given view. Callers should
         check for an empty result, indicating the view may not exist.
         '''
         try:
-            results = DatabaseDocumentQueryset([row['doc'] for row in self.db.view(view_name, include_docs=True)])
+            results = DatabaseDocumentCollection([row['doc'] for row in self.db.view(view_name, include_docs=True)])
         except couchdb.http.ResourceNotFound:
-            results = DatabaseDocumentQueryset()
+            results = DatabaseDocumentCollection()
         return results
 
 
@@ -222,8 +222,9 @@ class DatabaseConnector(object):
         the save will take place immediately.
         '''
         # Freeze contents so mutable data doesn't change before actual write
-        # XXX: Vet this assumption about copies
-        objects = [copy.deepcopy(obj) for obj in objects]
+        # and remove couchdb-disallowed keys (those starting w/an underscore)
+        objects = [{k: v for k, v in copy.deepcopy(obj).items() if not k.startswith('_') or k in ('_id', '_rev')}
+                   for obj in objects]
 
         # Enqueue the objects for saving
         self.write_queue.extend(objects)
@@ -232,9 +233,9 @@ class DatabaseConnector(object):
         if now or not objects:
             retry_queue = []
 
-            # Force document ids to follow the scheme slug:type:document_id
+            # Force document ids to follow the scheme slug:type:lang:document_id
             for document in self.write_queue:
-                document['_id'] = ':'.join(document.get(k,'') for k in ('slug', 'type', 'document_id'))
+                document['_id'] = ':'.join(document.get(k,'') for k in ('slug', 'type', 'lang', 'document_id'))
 
             for success,id,rev_or_exc in self.db.update(self.write_queue):
                 log('saved:', id) if success else warn('updating:', id, color='yellow')
@@ -289,7 +290,7 @@ class DatabaseDocument(collections.OrderedDict):
 
 
 
-class DatabaseDocumentQueryset(collections.UserList):
+class DatabaseDocumentCollection(collections.UserList):
     '''
     Simple container for a collection of DatabaseDocument objects
     '''
@@ -298,7 +299,7 @@ class DatabaseDocumentQueryset(collections.UserList):
 
         if a and isinstance(a[0], list):
             # If a list is passed, it will be interpreted as a request to wrap
-            # it in the DatabaseDocumentQueryset type
+            # it in the DatabaseDocumentCollection type
             documents = [DatabaseDocument(d) for d in a[0]]
 
         super().__init__(documents)
@@ -318,6 +319,6 @@ class DatabaseDocumentQueryset(collections.UserList):
         '''
         for d in self:
             d.save(now=False)
-        DatabaseConnector.save(now)
+        DatabaseConnector.save(now=now)
 
 
