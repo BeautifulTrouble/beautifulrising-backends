@@ -235,7 +235,9 @@ class DatabaseConnector(object):
 
             # Force document ids to follow the scheme slug:type:lang:document_id
             for document in self.write_queue:
-                document['_id'] = ':'.join(document.get(k,'') for k in ('slug', 'type', 'lang', 'document_id'))
+                if document.get('_id', '').startswith('_'):
+                    continue
+                document['_id'] = ':'.join(document.get(k,'') for k in ('lang', 'type', 'slug', 'document_id'))
 
             for success,id,rev_or_exc in self.db.update(self.write_queue):
                 log('saved:', id) if success else warn('updating:', id, color='yellow')
