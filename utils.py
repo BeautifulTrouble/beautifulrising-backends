@@ -2,6 +2,7 @@
 import contextlib
 import datetime
 import fcntl
+import json
 import os
 import re
 import sys
@@ -14,6 +15,18 @@ import unidecode
 
 
 DEBUG = '--debug' in sys.argv
+DEVELOP = '--develop' in sys.argv
+
+
+class JSONEncoder(json.JSONEncoder):
+    '''
+    JSON encoder which invokes magic _json method on custom classes
+    '''
+    def default(self, obj):
+        try:
+            return obj._json()
+        except AttributeError:
+            return json.JSONEncoder.default(self, obj)
 
 
 @contextlib.contextmanager
@@ -23,9 +36,10 @@ def script_directory():
     this script's directory. The working directory is restored afterward.
     '''
     cwd = os.getcwd()
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    directory = os.path.dirname(os.path.realpath(__file__))
+    os.chdir(directory)
     try:
-        yield
+        yield directory
     finally:
         os.chdir(cwd)
 
@@ -47,7 +61,7 @@ def script_subdirectory(name):
         log('mkdir: {}'.format(subdirectory))
     os.chdir(subdirectory)
     try: 
-        yield
+        yield subdirectory
     finally: 
         os.chdir(cwd)
 
@@ -127,28 +141,42 @@ def strip_smartquotes(s):
     For code mangled by a word processor
     '''
     pairs = '\u201c"', '\u201d"', "\u2018'", "\u2019'"
-    replace = lambda s,r: s.replace(*r)
+    replace = lambda s, r: s.replace(*r)
     return reduce(replace, pairs, s)
 
 
-def log(*s, fatal=False, tty=sys.stdout.isatty(), color='32', **kw): 
+def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
     '''
     Tee-style logging with timestamps
     '''
+    # Support foreground colors specified by name or ANSI escape number
+    colors = dict(zip('red green yellow blue magenta cyan white'.split(), range(31,38)))
+    colors.update({str(v):v for k,v in colors.items()})
+    color = colors[str(color).lower()]
+
+    # Select color or plain logging depending on terminal type
     logfmt = ('\x1b[30m[\x1b[{}m{{:^10}}\x1b[30m]\x1b[0m'.format(color) if tty else '[{:^10}]').format
+
+    # Format and colorize special messages (those with a colon after the first word)
     if ':' in s[0]:
         head, tail = s[0].split(':', maxsplit=1)
         s = [logfmt(head), tail, *s[1:]]
     s = ' '.join(map(str, s))
+
+    # Log to file
     script_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(script_dir, 'log.txt'), 'a', encoding="utf-8") as file:
         file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
+
+    # Log to terminal
     print(s, **kw)
+
+    # Exit
     if fatal:
         print('Quitting.')
         sys.exit(int(fatal))
 
-warn = lambda *s,fatal=False,color='33',**kw: log(*s, fatal=fatal, color=color, **kw)
+warn = lambda *s, fatal=False, color='red', **kw: log(*s, fatal=fatal, color=color, **kw)
 
 
 def die(*s):
@@ -160,6 +188,8 @@ def die(*s):
 
 __all__ = [
     'DEBUG',
+    'DEVELOP',
+    'JSONEncoder',
     'script_directory', 
     'script_subdirectory', 
     'only_one_process',
