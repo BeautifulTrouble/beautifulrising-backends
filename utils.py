@@ -36,9 +36,10 @@ def script_directory():
     this script's directory. The working directory is restored afterward.
     '''
     cwd = os.getcwd()
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    directory = os.path.dirname(os.path.realpath(__file__))
+    os.chdir(directory)
     try:
-        yield
+        yield directory
     finally:
         os.chdir(cwd)
 
@@ -60,7 +61,7 @@ def script_subdirectory(name):
         log('mkdir: {}'.format(subdirectory))
     os.chdir(subdirectory)
     try: 
-        yield
+        yield subdirectory
     finally: 
         os.chdir(cwd)
 
