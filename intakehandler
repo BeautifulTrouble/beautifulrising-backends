@@ -122,6 +122,10 @@ def handle_real_world_examples(requirements, form, notification_emails):
     send_mail(notification_emails, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
 
 
+def handle_contributor_question(contributor, question):
+    print(contributor, question)
+
+
 # When properly invoked, call an appropriate handle_* function
 # ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':

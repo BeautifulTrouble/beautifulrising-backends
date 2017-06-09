@@ -124,9 +124,9 @@ def recaptcha_is_valid(recaptcha_response, timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
+        'contributor-question': ['contributor', 'question'],
         'real-world-examples': ['document_title', 'document_link', 'title', 'link', 'description'],
         'resource': ['link'],
-        'question': [],
     }
     feature_extra = {
         'real-world-examples': lambda: config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
