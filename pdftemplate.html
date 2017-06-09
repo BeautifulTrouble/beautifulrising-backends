@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" {% if lang == 'ar' %}class="rtl"{% endif %}>
+    <head>
+        <meta charset="utf-8"/>
+        <style>
+        {% if lang == 'ar' %}
+        @font-face {
+            font-family: 'MyriadPro';
+            {% if embed_fonts %}
+            src: url('https://beautifulrising.org/assets/fonts/MyriadPro-Regular.otf');
+            {% else %}
+            src: url('/assets/fonts/MyriadPro-Regular.otf');
+            {% endif %}
+        }
+        {% else %}
+        @font-face {
+            font-family: 'Avenir';
+            {% if embed_fonts %}
+            src: url('https://beautifulrising.org/assets/fonts/Avenir-Book.ttf');
+            {% else %}
+            src: url('/assets/fonts/Avenir-Book.ttf');
+            {% endif %}
+        }
+        @font-face {
+            font-family: 'Avenir';
+            font-weight: bold;
+            {% if embed_fonts %}
+            src: url('https://beautifulrising.org/assets/fonts/Avenir-Black.ttf');
+            {% else %}
+            src: url('/assets/fonts/Avenir-Black.ttf');
+            {% endif %}
+        }
+        {% endif %}
+        html {
+            box-sizing: border-box;
+            direction: ltr;
+        }
+        html.rtl {
+            direction: rtl;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        a:link, a:visited, a:hover, a:active { 
+            color:#000; 
+            text-decoration: none;
+        }
+        body {
+            {% if lang == 'ar' %}
+            font-family: MyriadPro;
+            {% else %}
+            font-family: Avenir;
+            {% endif %}
+            font-size: 10.3px;
+            letter-spacing: .5px;
+            margin: 0;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: bold;
+        }
+        h1 {
+            font-size: 16.5px;
+            text-transform: uppercase;
+            line-height: 120%;
+        }
+        h2 {
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        h4 {
+            margin: 0;
+            font-size: 11px;
+        }
+        .type {
+            page-break-before: always;
+            margin-bottom: 0;
+        }
+        .type:nth-child(1) {
+            page-break-before: avoid;
+            margin-top: 0;
+        }
+        .title {
+            margin: -2px 0 0 0;
+        }
+        .contributed {
+            margin-bottom: 0;
+        }
+        .author {
+            display: inline-block;
+            vertical-align: top;
+            width: 45%;
+        }
+        .author:nth-child(even) {
+            position: relative;
+            left: 10%;
+        }
+        .rtl .author:nth-child(even) {
+            left: 0;
+            right: 10%;
+        }
+        .author .name {
+            font-weight: bold;
+            margin-bottom: -5px;
+        }
+        .hr {
+            border-top: 1.5px solid black;
+            margin-top: 10px;
+        }
+        hr {
+            border: none;
+            margin-top: 10px;
+        }
+        hr:before {
+            content: "";
+            background: black;
+            height: .75px;
+            display: block;
+        }
+        .footnote hr {
+            display: none;
+        }
+        .pull-quote {
+            border-bottom: 1.5px solid black;
+        }
+        .content-wrapper {
+            margin-top: 10px;
+        }
+        .content {
+            position: relative;
+            left: 0; top: 0;
+            width: 100%;
+            display: table;
+        }
+        .main {
+            width: 100%;
+            padding-right: 15px;
+        }
+        .rtl .main {
+            padding-right: 0;
+            padding-left: 15px;
+        }
+        .sidebar {
+            /* position: absolute; right: 0; top: 0; */
+            width: 34%;
+            display: table-cell;
+        }
+        .sidebar-inner {
+            padding-left: 15px;
+            border-left: 1.5px solid black;
+        }
+        .rtl .sidebar-inner {
+            padding-left: none;
+            border-left: none;
+            padding-right: 15px;
+            border-right: 1.5px solid black;
+        }
+        h3:nth-child(1) {
+            margin-top: 0;
+        }
+        h4.key {
+            margin-bottom: -10px;
+        }
+        .learn-item {
+            margin: 0;
+        }
+        .learn-link {
+            font-size: 8px;
+        }
+        </style>
+    </head>
+    <body>
+        {% for module in modules %}
+        {% if 'SNAPSHOT' in module['document_title'] %}
+        {% continue %}
+        {% endif %}
+        <h2 class="type">{{ text['types'].get(module.get('type')) }}</h2>
+        <h1 class="title">{{ module.get('title') }}</h1>
+        <p class="short">{{ markdown(module.get('snapshot')) }}</p>
+        {% if module.get('authors') %}
+        <h2 class="contributed">{{ text['contributed'] }}</h2>
+        <div class="authors">
+            {% for author in module.get('authors', []) -%}
+            {% if people.get(author) -%}<div class="author">
+                <p>
+                    <div class="name">{{ people.get(author, {}).get('title') }}</div>
+                    {{ markdown(people.get(author, {}).get('bio')) }}
+                </p>
+            </div>{% endif -%}
+            {% endfor -%}
+        </div>
+        {% endif %}
+        <div class="hr"></div>
+        {% if module.get('pull-quote') %}
+        <div class="pull-quote">
+            <h1>&ldquo;{{ module['pull-quote'] }}&rdquo;</h1>
+        </div>
+        {% endif %}
+        <div class="content-wrapper">
+            <div class="content">
+                <div class="main">
+                    {% if module.get('epigraphs') %}
+                    {% for epigraph in module['epigraphs'] %}
+                    <p class="epigraph">
+                    {{ epigraph[0] }}<br>&mdash;{{ epigraph[1] }}
+                    </p>
+                    {% endfor %}
+                    {% endif %}
+                    {% if module.get('full-write-up') %}
+                    {{ markdown(module['full-write-up']) }}
+                    {% elif module.get('short-write-up') %}
+                    {{ markdown(module['short-write-up']) }}
+                    {% endif %}
+
+                    {% if module.get('learn-more') %}
+                    <br>
+                    <h3 class="learn">{{ text['learn'] }}</h3>
+                    {% for learn in module['learn-more'] %}
+                    {% if learn.get('title') %}<p class="learn-item">{{ learn['title'] }}</p>{% endif %}
+                    {% if learn.get('source') %}
+                        <p class="learn-item">{{ learn['source'] }}{% if learn.get('year') %}, {{ learn['year'] }}{% endif %}</p>
+                    {% endif %}
+                    {% if learn.get('link') %}
+                        <p class="learn-item learn-link"><a href="{{ learn['link'] }}">{{ learn['link'] }}</a></p>
+                    {% endif %}
+                    <br>
+                    {% endfor %}
+                    {% endif %}
+                </div><div class="sidebar">
+                    <div class="sidebar-inner">
+                        {% if module.get('potential-risks') %}
+                        <h3>{{ text['risks'] }}</h3>
+                        <p class="risks">{{ markdown(module['potential-risks']) }}</p>
+                        {% endif %}
+                        {% for type in type_order %}
+                        {% if module.get('key-' + type) %}
+                            {% if len(module['key-' + type]) == 1 %}
+                            <h3>{{ text['key'][type][0] }}</h3>
+                            {% else %}
+                            <h3>{{ text['key'][type][1] }}</h3>
+                            {% endif %}
+                            {% for thing in module['key-' + type] %}
+                            <h4 class="key">{{ thing[0] }}</h4>
+                            {{ markdown(thing[1]) }}
+                            {% endfor %}
+                        {% endif %}
+                        {% endfor %}
+
+                        {% for type in type_order %}
+                        {% if module.get(type) %}
+                        <h3>{{ text['related'] }}</h3>
+                        {% break %}
+                        {% endif %}
+                        {% endfor %}
+
+                        {% for type in type_order %}
+                        {% if module.get(type) %}
+                        <h4 class="related">{{ text['types'][type] }}</h4>
+                        <p>
+                            {% for related in module[type] %}
+                            -&nbsp;<a href="{{ related[0] }}">{{ related[1] }}</a><br>
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if module.get('tags') %}
+                        <h3 class="tags">{{ text['tags'] }}</h3>
+                        {% for tag in module['tags'] %}
+                        <span>
+                            <a href="{{ text['tagtext'].get(tag)[0] }}">
+                                {{ text['tagtext'].get(tag)[1] }}{% if not loop.last %}, {% endif %}</a>
+                        </span>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </body>
+</html>

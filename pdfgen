@@ -1,0 +1,339 @@
+#!/usr/bin/env python
+#encoding: utf-8
+
+# Auto-install and activate a virtualenv if possible
+import autovenv
+autovenv.run()
+
+import re
+import sys
+import time
+from hashlib import md5
+from urllib.parse import urljoin
+
+import psutil
+import requests
+from bs4 import BeautifulSoup
+from flask import Flask, Response, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from jinja2 import Template
+from markdown import markdown as markdown_
+from plucky import pluck, plucks
+from selenium import webdriver
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound
+
+from utils import (
+    log, 
+    script_directory, 
+    script_subdirectory,
+    slugify, 
+    warn,
+)
+from config import (
+    API_INTAKE_LIMIT, 
+    API_PATH,
+    API_SERVER, 
+    MAILGUN_API_KEY, 
+    PDF_CACHE_LIFESPAN,
+    PDF_API_CACHE_LIFESPAN,
+)
+
+RELATIVE_URL_REGEX = re.compile('^/tool/.+')
+ABSOLUTE_URL_PREFIX = 'https://beautifulrising.org'
+TAG_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tag/%s')
+TOOL_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tool/%s')
+TYPE_ORDER = 'story', 'tactic', 'principle', 'theory', 'methodology'
+
+
+app = Flask(__name__)
+limiter = Limiter(app, key_func=get_remote_address)
+config = requests.get('{}{}/config'.format(API_SERVER, API_PATH)).json()
+
+
+# A language-keyed dict of dicts containing text for outgoing emails
+# Since this is fetched once at server launch, updates require a restart
+email_text = {lang: {
+        'from_': '{} <noreply@beautifulrising.org>'.format(plucks(text, 'email.from')),
+        'subject': plucks(text, 'email.subject'),
+        'message': plucks(text, 'email.message'),
+        # Mailgun has issues with non-ascii filenames
+        'filename': 'beautifulrising.pdf'
+    } for lang, text in {lang: requests.get('{}{}/text/pdf?lang={}'.format(API_SERVER, API_PATH, lang)).json()
+                         for lang in config['language-all']}.items()}
+
+email_is_valid = re.compile(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$').match
+
+
+
+
+def phantom_init():
+    '''
+    PhantomJS has a bug which sometimes causes new phantomjs processes to spawn
+    until memory is exhausted, so phantom_init & phantom_exit monitor the
+    situation and kill off these processes as needed. 
+    '''
+
+    global phantom
+    try: phantom
+    except NameError:
+        phantom = webdriver.PhantomJS()
+        phantom.command_executor._commands['execute'] = ('POST', '/session/$sessionId/phantom/execute')
+        log('phantomjs: starting up...')
+
+
+def phantom_exit():
+    '''
+    If this bug is ever fixed, these functions can safely go away and be replaced
+    by a single persistent instance of webdriver.PhantomJS()
+    '''
+
+    global phantom
+    children = [c for c in psutil.Process().children() if c.name() == 'phantomjs']
+    if len(children) > 1:
+        warn("phantomjs: runaway processes detected, attempting to control the situation...", color='yellow')
+        phantom_execute('phantom.exit();')
+        for child in children:
+            child.terminate()
+        del phantom
+
+
+def phantom_execute(script, args=None):
+    '''
+    This function runs a javascript snippet within the PhantomJS environment
+    It relies on this line found in phantom_init:
+
+        phantom.command_executor._commands['execute'] = (
+            'POST', '/session/$sessionId/phantom/execute')
+    '''
+
+    if args is None:
+        args = []
+    phantom.execute('execute', {'script': script, 'args': args})
+
+
+
+
+def markdown(s):
+    '''
+    Render markdown and filter content which is inappropriate for display in
+    PDFs. Images are stripped and relative links made absolute.
+    '''
+
+    if s is None:
+        s = ''
+
+    html = markdown_(s, output_format='html5', extensions=['markdown.extensions.footnotes'])
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Strip images
+    for img in soup.findAll('img'):
+        img.extract()
+
+    # Make relative links absolute
+    for rel_link in soup.findAll('a', href=RELATIVE_URL_REGEX):
+        rel_link.attrs['href'] = urljoin(ABSOLUTE_URL_PREFIX, rel_link.attrs['href'])
+
+    html = str(soup)
+    return html
+
+
+
+
+def get_modules_people_and_text(module_slugs, lang, *, cache={}):
+    '''
+    Get (cached) modules, people and text.
+    `modules` returned are the requested subset
+    `people` is the entire collection of people
+    `text` is a select subset of needed strings
+    '''
+
+    # Only fetch API data once per PDF_API_CACHE_LIFESPAN per language
+    now = time.time()
+    c = cache.setdefault(lang, {})
+    
+    if now - c.get('last_request', 0) > PDF_API_CACHE_LIFESPAN:
+        content = requests.get('{}{}/all?lang={}'.format(API_SERVER, API_PATH, lang)).json()
+
+        c['people'] = {o.get('slug'): o for o in content if o.get('type') == 'person'}
+        c['texts'] = {o.get('slug'): o for o in content if o.get('type') == 'text'}
+
+        # Prepare the relevant pieces of translation
+        text = c['text'] = {}
+        text['contributed'] = plucks(c['texts'], 'ui.module.contributed-by')
+        text['learn'] = plucks(c['texts'], 'ui.module.learn-more')
+        text['module'] = plucks(c['texts'], 'ui.module')
+        text['related'] = plucks(c['texts'], 'ui.module.related-modules')
+        text['risks'] = plucks(c['texts'], 'ui.module.potential-risks')
+        text['tags'] = plucks(c['texts'], 'ui.module.tags')
+        text['types'] = plucks(c['texts'], 'ui.types')
+        # Get key-whatever translations in singular & plural
+        text['key'] = {p: [plucks(c['texts'], 'ui.module.key-' + s), 
+                           plucks(c['texts'], 'ui.module.key-' + p)]
+                       for s,p in config['plural-name-for-type'].items()}
+        # Produce table of tag translations
+        text['tagtext'] = {slugify(k): (TAG_URL % slugify(k), v.capitalize()) 
+                           for k, v in plucks(c['texts'], 'tags.all').items()}
+
+        # Preprocess the modules for easier use in template rendering
+        module_types = [t['one'] for t in config['types-modules']]
+        modules = c['modules'] = {o.get('slug'): o for o in content if o.get('type') in module_types}
+        titles = c['titles'] = {k: v.get('title') for k,v in c['modules'].items()}
+
+        episplit = re.compile(r'\s+[—–―-](?=[^—–―-]+$)').split
+        keysplit = re.compile(r'\s+[—–―-]\s+').split
+        for slug,m in modules.items():
+            m['tags'] = [slugify(t) for t in m.get('tags', [])]
+            m['epigraphs'] = [episplit(e) for e in m.get('epigraphs', [])]
+            for type_ in text['key']:
+                m['key-' + type_] = [keysplit(k) for k in m.get('key-' + type_, [])]
+            # Replace related module slugs with (url, title)
+            for type_ in text['key']:
+                if type_ in m:
+                    m[type_] = [(TOOL_URL % s, titles.get(s, s)) for s in m[type_]]
+
+        c['last_request'] = now
+        log('pdfgen: fetching {} modules'.format(lang))
+
+    # When no module_slugs are provided, all modules are used
+    if not module_slugs:
+        module_slugs = c['modules'].keys()
+    
+    # Remove duplicates
+    module_slugs = set(module_slugs)
+
+    # Unsorted modules are picked from the collection by slug
+    modules = [c['modules'][slug] for slug in module_slugs if slug in c['modules']]
+
+    # Modules are sorted by title and grouped by type
+    modules_by_type = {t: sorted([m for m in modules if m['type'] == t], key=lambda m: m['title']) 
+                       for t in TYPE_ORDER}
+
+    # The final ordered list is created as a sequence of typed groups
+    modules_ordered = []
+    for t in TYPE_ORDER:
+        modules_ordered.extend(modules_by_type[t])
+
+    return modules_ordered, c['people'], c['text']
+
+
+
+
+def make_pdf(modules, lang, paper_size, unique_hash):
+    '''
+    Produce a bytes object containing a PDF rendered by PhantomJS by way of a 
+    jinja2 template.
+    '''
+
+    phantom_init()
+
+    # TODO: investigate the phantomjs font rendering issues
+    embed_fonts = False
+    modules, people, text = get_modules_people_and_text(modules, lang)
+
+    with script_directory():
+        with open('pdftemplate.html') as f:
+            template = Template(f.read(), extensions=['jinja2.ext.loopcontrols'])
+    html = template.render(markdown=markdown, **__builtins__.__dict__, **vars())
+
+    with script_subdirectory('pdfcache') as subdirectory:
+        with open('{}.html'.format(unique_hash), 'w') as f:
+            f.write(html)
+
+        phantom.get('file:///{}/{}.html'.format(subdirectory, unique_hash))
+        phantom_execute('''this.paperSize = {{
+            format: "{}",
+            orientation: "portrait", 
+            margin: {{
+                top: "20px", bottom: "20px",
+                left: "30px", right: "30px"
+            }}
+        }}'''.format(paper_size))
+        phantom_execute('this.render("{}/{}.pdf")'.format(subdirectory, unique_hash))
+
+        with open('{}.pdf'.format(unique_hash), 'rb') as f:
+            pdf = f.read()
+
+    phantom_exit()
+    return pdf
+
+
+
+
+def send_mail(to, from_, subject, message, filename, pdf):
+    '''
+    Send mail via the Mailgun API
+    '''
+
+    try:
+        r = requests.post('https://api.mailgun.net/v3/beautifulrising.org/messages',
+            auth=('api', MAILGUN_API_KEY),
+            data={'to': [to], 'from': from_, 'subject': subject, 'text': message},
+            files=[('attachment', (filename, pdf))])
+    except requests.RequestException:
+        r = None
+    return r
+
+
+
+
+@app.route('/pdf/<request_type>', methods=['GET'])
+#@limiter.limit(API_INTAKE_LIMIT)
+def pdf(request_type):
+    '''
+    This route provides two main endpoints:
+        /pdf/email
+        /pdf/download
+
+    Each with three optional query parameters:
+        tools=flash-mob tools=flash-mob,divestment (defaulting to all)
+        lang=en (defaulting to language-default from the config)
+        size=a4 size=letter (defaulting to letter)
+
+    And one with a required query parameter:
+        /pdf/email?address=joe@schmoe.net
+
+    Thus, a valid GET might look like any of these:
+        /pdf/download (all modules)
+        /pdf/email?tools=flash-mob
+        /pdf/email?tools=flash-mob,divestment
+        /pdf/email?tools=flash-mob,divestment&lang=es&size=a4
+        /pdf/download?tools=divestment&size=a4
+    '''
+
+    modules = request.args.get('tools')
+    modules = modules.split(',') if modules else []
+
+    lang = request.args.get('lang', '')
+    if lang not in config['language-all']:
+        lang = config['language-default']
+
+    size = request.args.get('size', '')
+    if size not in ('a4', 'letter'):
+        size = 'letter'
+
+    address = request.args.get('address', '')
+
+    # Create a unique hash of the PDF's specifics
+    unique = '{}{}{}'.format(sorted(set(modules)), lang, size)
+    unique_hash = md5(unique.encode()).hexdigest()
+
+    if request_type in ('email', 'download'):
+        if request_type == 'email' and email_is_valid(address):
+            pdf = make_pdf(modules, lang, size, unique_hash)
+            send_mail(to=address, pdf=pdf, **email_text[lang])
+            return 'OK', 200
+
+        elif request_type == 'download':
+            pdf = make_pdf(modules, lang, size, unique_hash)
+            return Response(pdf, mimetype='application/pdf')
+            #return 'OK', 200
+
+    raise BadRequest
+
+
+
+if __name__ == '__main__':
+    app.run(port=6005, debug=True)
+
+
