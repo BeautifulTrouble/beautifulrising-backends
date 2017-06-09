@@ -261,8 +261,8 @@ def make_pdf(modules, lang, paper_size, unique_hash):
                 top: "20px", bottom: "20px",
                 left: "30px", right: "30px"
             }}
-        }}'''.format(paper_size))
-        phantom_execute('this.render("{}/{}.pdf")'.format(subdirectory, unique_hash))
+        }};'''.format(paper_size))
+        phantom_execute('this.render("{}/{}.pdf");'.format(subdirectory, unique_hash))
 
         with open('{}.pdf'.format(unique_hash), 'rb') as f:
             pdf = f.read()
