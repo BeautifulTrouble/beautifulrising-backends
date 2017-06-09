@@ -139,6 +139,9 @@
             width: 100%;
             padding-right: 15px;
         }
+        .main p {
+            word-break: break-word;
+        }
         .rtl .main {
             padding-right: 0;
             padding-left: 15px;
@@ -205,7 +208,7 @@
                     {% if module.get('epigraphs') %}
                     {% for epigraph in module['epigraphs'] %}
                     <p class="epigraph">
-                    {{ epigraph[0] }}<br>&mdash;{{ epigraph[1] }}
+                    {{ epigraph[0] }}<br>&mdash;{{ markdown(epigraph[1], p=False) }}
                     </p>
                     {% endfor %}
                     {% endif %}

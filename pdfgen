@@ -114,14 +114,17 @@ def phantom_execute(script, args=None):
 
 
 
-def markdown(s):
+def markdown(s, p=True, *, cache={}):
     '''
     Render markdown and filter content which is inappropriate for display in
     PDFs. Images are stripped and relative links made absolute.
     '''
 
-    if s is None:
-        s = ''
+    if not s:
+        return ''
+
+    #if s in cache:
+    #    return cache[s]
 
     html = markdown_(s, output_format='html5', extensions=['markdown.extensions.footnotes'])
     soup = BeautifulSoup(html, 'html.parser')
@@ -135,6 +138,13 @@ def markdown(s):
         rel_link.attrs['href'] = urljoin(ABSOLUTE_URL_PREFIX, rel_link.attrs['href'])
 
     html = str(soup)
+
+    if not p:
+        html = re.sub(r'^\s*<p>', '', html)
+        html = re.sub(r'</p>\s*$', '', html)
+
+    #cache[s] = html
+
     return html
 
 
@@ -180,8 +190,10 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
         modules = c['modules'] = {o.get('slug'): o for o in content if o.get('type') in module_types}
         titles = c['titles'] = {k: v.get('title') for k,v in c['modules'].items()}
 
-        episplit = re.compile(r'\s+[—–―-](?=[^—–―-]+$)').split
-        keysplit = re.compile(r'\s+[—–―-]\s+').split
+        # Is there another way to ensure that these split strings always have two elements?
+        episplit = lambda s: re.split(r'\s+[—–―-](?=[^—–―-]+$)', s) + ['']
+        keysplit = lambda s: re.split(r'\s+[—–―-]\s+', s) + ['']
+
         for slug,m in modules.items():
             m['tags'] = [slugify(t) for t in m.get('tags', [])]
             m['epigraphs'] = [episplit(e) for e in m.get('epigraphs', [])]
@@ -229,6 +241,7 @@ def make_pdf(modules, lang, paper_size, unique_hash):
 
     # TODO: investigate the phantomjs font rendering issues
     embed_fonts = False
+    type_order = [config['plural-name-for-type'][t] for t in TYPE_ORDER]
     modules, people, text = get_modules_people_and_text(modules, lang)
 
     with script_directory():
@@ -278,7 +291,7 @@ def send_mail(to, from_, subject, message, filename, pdf):
 
 
 @app.route('/pdf/<request_type>', methods=['GET'])
-#@limiter.limit(API_INTAKE_LIMIT)
+@limiter.limit(API_INTAKE_LIMIT)
 def pdf(request_type):
     '''
     This route provides two main endpoints:
@@ -327,13 +340,12 @@ def pdf(request_type):
         elif request_type == 'download':
             pdf = make_pdf(modules, lang, size, unique_hash)
             return Response(pdf, mimetype='application/pdf')
-            #return 'OK', 200
 
     raise BadRequest
 
 
 
 if __name__ == '__main__':
-    app.run(port=6005, debug=True)
+    app.run(port=6005)
 
 
