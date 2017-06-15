@@ -308,9 +308,9 @@ def pdf(request_type):
 
     Thus, a valid GET might look like any of these:
         /pdf/download (all modules)
-        /pdf/email?tools=flash-mob
-        /pdf/email?tools=flash-mob,divestment
-        /pdf/email?tools=flash-mob,divestment&lang=es&size=a4
+        /pdf/email?tools=flash-mob&address=joe@schmoe.net
+        /pdf/email?tools=flash-mob,divestment&address=joe@schmoe.net
+        /pdf/email?tools=flash-mob,divestment&lang=es&size=a4&address=joe@schmoe.net
         /pdf/download?tools=divestment&size=a4
     '''
 
