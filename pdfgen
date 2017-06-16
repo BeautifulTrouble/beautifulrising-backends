@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 
 import psutil
 import requests
+import validators
 from bs4 import BeautifulSoup
 from flask import Flask, Response, request
 from flask_limiter import Limiter
@@ -61,8 +62,6 @@ email_text = {lang: {
         'filename': 'beautifulrising.pdf'
     } for lang, text in {lang: requests.get('{}{}/text/pdf?lang={}'.format(API_SERVER, API_PATH, lang)).json()
                          for lang in config['language-all']}.items()}
-
-email_is_valid = re.compile(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$').match
 
 
 
@@ -332,7 +331,7 @@ def pdf(request_type):
     unique_hash = md5(unique.encode()).hexdigest()
 
     if request_type in ('email', 'download'):
-        if request_type == 'email' and email_is_valid(address):
+        if request_type == 'email' and validators.email(address):
             pdf = make_pdf(modules, lang, size, unique_hash)
             send_mail(to=address, pdf=pdf, **email_text[lang])
             return 'OK', 200
