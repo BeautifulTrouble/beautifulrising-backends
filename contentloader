@@ -218,7 +218,11 @@ class ContentLoader(object):
                         if language == language_default:
                             link_text = nest_parens(content['title'], 1)
                         else:
-                            link_text = nest_parens(content['translations'][language]['title'], 1)
+                            try:
+                                link_text = nest_parens(content['translations'][language]['title'], 1)
+                            # Linking to a non-existent translation? Yikes. Insert the default language name.
+                            except KeyError:
+                                link_text = nest_parens(content['title'], 1)
                         type_name = types[language][content['type']].upper()
                         replacement = xref_fmt_strings[language].format(xrefpat) % (type_name, link_text, content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
