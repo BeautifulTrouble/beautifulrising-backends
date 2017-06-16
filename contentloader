@@ -29,6 +29,9 @@ from utils import *
 from config import *
 
 
+NEW = '_new_content'
+
+
 class ContentLoader(object):
     def __init__(self):
         # Parse command line arguments
@@ -119,6 +122,9 @@ class ContentLoader(object):
 
             all_content = self.merge_translations(all_content)
             all_content = self.fix_relationships(all_content)
+
+            all_content = self.xref_links(all_content)
+
             self.download_assets()
             self.db_save(all_content)
 
@@ -127,41 +133,11 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+\)?\s*)\)').search
-        xrefpat = self.config['xref-link-pattern']
         language_default = self.config['language-default']
-
-        def patch_links(text):
-            m, chunks = matcher(text), []
-            while m:
-                link_text, module_name, _, end = *m.groups(), *m.span()
-                # TODO: ensure this gets the right language, even on a fresh load
-                content = self.find_content(module_name, all_content, thresh=90)
-                if content:
-                    if link_text:
-                        replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
-                    else:
-                        link_text = nest_parens(content['title'], 1)
-                        replacement = '(see: [%s: %s]({}))'.format(xrefpat) % (content['type'].upper(), link_text, content['slug'])
-                    chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
-                else:
-                    #TODO: do something clever when a x-refed module is missing?
-                    chunks.append(text[:end])
-                text = text[end:]
-                m = matcher(text)
-            return ''.join(chunks) + text
-
-        # Recursive visitor reaches all deeply nested strings
-        visit_all = lambda x: {
-            list:   lambda L: [visit_all(i) for i in L],
-            dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
-            str:    lambda s: patch_links(s),
-            int:    lambda i: i,
-        }[dict if isinstance(x, dict) else type(x)](x)
 
         module_types = [t['one'] for t in self.config['types-modules']]
         for content in all_content:
-            if '_new_content' in content:
+            if NEW in content:
                 # Add a module-type
                 if content['type'] in module_types:
                     content['module-type'] = 'full'
@@ -186,10 +162,6 @@ class ContentLoader(object):
                 tags = content.get('tags')
                 if tags and len(tags) == 3 and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
                     del content['tags']
-                # Patch up links between modules
-                for field in self.config['markdown']:
-                    if content.get(field):
-                        content[field] = visit_all(content.get(field))
                 # Produce a byline key
                 authors = content.get('authors')
                 if authors and content['lang'] == language_default:
@@ -204,7 +176,86 @@ class ContentLoader(object):
                         content['byline'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
                         content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
                         content['byline-ar'] = ' \u0648 '.join(authors)
-                del content['_new_content']
+        return all_content
+
+
+    def xref_links(self, all_content):
+        '''
+        As a final step, iterate through all modules and patch up module links
+        '''
+        language_all = self.config['language-all']
+        language_default = self.config['language-default']
+        markdown_fields = self.config['markdown']
+        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http).+)\)').search
+        xrefpat = self.config['xref-link-pattern']
+
+        # Ideally these strings would live in some kind of configurable
+        # place, but time constraints make that a low-priority
+        xref_fmt_strings = {
+            'en': '(see: [%s: %s]({}))',
+            'es': '(ver: [%s: %s]({}))',
+            'ar': '(انظر [%s: %s]({}))',
+        }
+        types = {
+            'en': {'methodology': 'methodology', 'principle': 'principle',
+                'story': 'story', 'tactic': 'tactic', 'theory': 'theory'},
+            'es': {'methodology': 'metodología', 'principle': 'principio',
+                'story': 'historia', 'tactic': 'táctica', 'theory': 'teoría'},
+            'ar': {'methodology': 'منهجية', 'principle': 'مبدأ',
+                'story': 'قصة', 'tactic': 'تكتيك', 'theory': 'نظرية'},
+        }
+
+        def patch_links(text):
+            m, chunks = matcher(text), []
+            while m:
+                link_text, module_name, _, end = *m.groups(), *m.span()
+                # TODO: ensure this gets the right language, even on a fresh load
+                content = self.find_content(module_name, all_content, thresh=90)
+                if content:
+                    if link_text:
+                        replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
+                    else:
+                        if language == language_default:
+                            link_text = nest_parens(content['title'], 1)
+                        else:
+                            link_text = nest_parens(content['translations'][language]['title'], 1)
+                        type_name = types[language][content['type']].upper()
+                        replacement = xref_fmt_strings[language].format(xrefpat) % (type_name, link_text, content['slug'])
+                    chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
+                else:
+                    #TODO: do something clever when a x-refed module is missing?
+                    chunks.append(text[:end])
+                text = text[end:]
+                m = matcher(text)
+            return ''.join(chunks) + text
+
+        # Recursive visitor reaches all deeply nested strings
+        visit_all = lambda x: {
+            list:   lambda L: [visit_all(i) for i in L],
+            dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
+            str:    lambda s: patch_links(s),
+            int:    lambda i: i,
+        }[dict if isinstance(x, dict) else type(x)](x)
+
+        for content in all_content:
+            language = content['lang']
+            if NEW in content and language in language_all:
+                for field in self.config['markdown']:
+                    if content.get(field):
+                        content[field] = visit_all(content.get(field))
+
+            # This should be the last time the NEW marker is needed
+            content.pop(NEW, None)
+
+            for language, c in content['translations'].items():
+                if NEW in c and language in language_all:
+                    for field in self.config['markdown']:
+                        if c.get(field):
+                            c[field] = visit_all(c.get(field))
+
+                # This should be the last time the NEW marker is needed
+                c.pop(NEW, None)
+
         return all_content
 
 
@@ -218,7 +269,7 @@ class ContentLoader(object):
         cached = fuzzy_match_cache.get(item_name)
         if cached:
             return cached
-        match = fuzzy(item_name, item_list, processor=lambda m: m['title'])
+        match = fuzzy(item_name, item_list, processor=lambda m: m.get('title', ''))
         if match and match[1] >= thresh:
             fuzzy_match_cache[item_name] = match[0]
             return match[0]
@@ -370,7 +421,7 @@ class ContentLoader(object):
         Process a document and return a content item.
         '''
         content = parse_archieml(document.text)
-        content['_new_content'] = True
+        content[NEW] = True
 
         # Rename synonymous keys (this should happen before all other transformations)
         for old_key,new_key in self.config['synonyms'].items():
