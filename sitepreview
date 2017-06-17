@@ -4,12 +4,16 @@ import autovenv
 autovenv.run()
 
 
+import json
 import os
+import subprocess
 import sys
+from http.client import HTTPException
 
 import magic
 import psutil
 import requests
+import validators
 from bs4 import BeautifulSoup
 from selenium import webdriver
 
@@ -67,7 +71,7 @@ def download_og_image(url, output_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 3 or not validators.url(sys.argv[1]):
         die('preview: Usage: {} SITE_URL OUTPUT_FILENAME'.format(os.path.basename(sys.argv[0])))
 
     url, output_path = sys.argv[1:]
@@ -79,11 +83,23 @@ if __name__ == '__main__':
     if not download_og_image(url, output_path):
         log('phantomjs: starting up...')
 
-        phantom = webdriver.PhantomJS()
-        phantom.command_executor._commands['execute'] = ('POST', '/session/$sessionId/phantom/execute')
-        phantom.get(url)
-        phantom_execute('this.render("{}");'.format(output_path))
-        phantom_execute('phantom.exit();')
+        try:
+            phantom = webdriver.PhantomJS()
+            phantom.command_executor._commands['execute'] = ('POST', '/session/$sessionId/phantom/execute')
+            phantom.get(url)
+            phantom_execute('''
+                // Prevent transparent pages
+                this.evaluate(function() {{ document.body.bgColor = 'white'; }});
+                this.viewportSize = {{width: {w}, height: {h}}};
+                this.clipRect = {{top: 0, left: 0, width: {w}, height: {h}}};
+                this.render({json_output_path});
+                phantom.exit();
+            '''.format(w=1366, h=768, json_url=json.dumps(url), json_output_path=json.dumps(output_path)))
+        except HTTPException:
+            log('phantomjs: failed to fetch "{}"'.format(url))
+        else:
+            log('preview: converting preview image {}'.format(output_path))
+            subprocess.run(['convert', '-resize', '50%', output_path, output_path])
 
         for c in psutil.Process().children():
             if c.name() == 'phantomjs':
