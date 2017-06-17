@@ -122,7 +122,9 @@ def handle_real_world_examples(requirements, form, notification_emails):
     send_mail(notification_emails, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
 
 
-def handle_contributor_question(contributor, question):
+def handle_contributor_question(requirements, form):
+    contributor = form['contributor']
+    question = form['question']
     url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
     try:
         j = requests.get(url, headers={'x-api-admin-token': API_ADMIN_TOKEN}).json()
