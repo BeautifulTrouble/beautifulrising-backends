@@ -165,7 +165,11 @@ def filter_output(resources):
         lang = language_default
 
     # Identify the keys which should be hidden from the API
-    private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
+    # HTTPS/localhost connections can circumvent w/an X-API-Admin-Token: header
+    if request.headers['x-api-admin-token'] == API_ADMIN_TOKEN:
+        private_keys = {}
+    else:
+        private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
 
     output = []
     for resource in resources:
