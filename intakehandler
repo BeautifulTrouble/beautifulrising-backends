@@ -126,12 +126,14 @@ def handle_contributor_question(contributor, question):
     url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
     try:
         j = requests.get(url, headers={'x-api-admin-token': API_ADMIN_TOKEN}).json()
-        contributor_email = j['email']
+        contributor_email = j.get('email', '')
+        contributor_name = j.get('title', '')
     except requests.RequestException:
-        send_mail(ADMIN_EMAIL, "This BR question for '{}' failed to send".format(contributor), question)
+        send_mail(ADMIN_EMAIL, "This BR question for {} failed to send".format(contributor), question)
     else:
-        send_mail(ADMIN_EMAIL, 'A Beautiful Rising user asked...', question)
-        send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
+        send_mail(ADMIN_EMAIL, "A Beautiful Rising user asked {}...".format(contributor_name), question)
+        if contributor_email:
+            send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
 
 
 # When properly invoked, call an appropriate handle_* function
