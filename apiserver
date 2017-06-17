@@ -124,9 +124,9 @@ def recaptcha_is_valid(recaptcha_response, timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
+        'contributor-question': ['contributor', 'question'],
         'real-world-examples': ['document_title', 'document_link', 'title', 'link', 'description'],
         'resource': ['link'],
-        'question': [],
     }
     feature_extra = {
         'real-world-examples': lambda: config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
@@ -165,7 +165,11 @@ def filter_output(resources):
         lang = language_default
 
     # Identify the keys which should be hidden from the API
-    private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
+    # HTTPS/localhost connections can circumvent w/an X-API-Admin-Token: header
+    if request.headers['x-api-admin-token'] == API_ADMIN_TOKEN:
+        private_keys = {}
+    else:
+        private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
 
     output = []
     for resource in resources:
