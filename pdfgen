@@ -230,11 +230,20 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
 
 
 
-def make_pdf(modules, lang, paper_size, unique_hash):
+def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}):
     '''
     Produce a bytes object containing a PDF rendered by PhantomJS by way of a 
     jinja2 template.
     '''
+    now = time.time()
+    if now - last_generation.get(unique_hash, 0) < PDF_CACHE_LIFESPAN:
+        try:
+            with script_subdirectory('pdfcache'):
+                with open('{}.pdf'.format(unique_hash), 'rb') as f:
+                    log('pdfgen: sending cached pdf')
+                    return f.read()
+        except OSError: pass
+    last_generation[unique_hash] = now
 
     phantom_init()
 
@@ -242,6 +251,7 @@ def make_pdf(modules, lang, paper_size, unique_hash):
     embed_fonts = False
     type_order = [config['plural-name-for-type'][t] for t in TYPE_ORDER]
     modules, people, text = get_modules_people_and_text(modules, lang)
+    log('pdfgen: generating pdf of {} module(s)'.format(len(modules)))
 
     with script_directory():
         with open('pdftemplate.html') as f:
