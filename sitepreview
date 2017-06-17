@@ -1,0 +1,108 @@
+#!/usr/bin/env python
+
+import autovenv
+autovenv.run()
+
+
+import json
+import os
+import subprocess
+import sys
+from http.client import HTTPException
+
+import magic
+import psutil
+import requests
+import validators
+from bs4 import BeautifulSoup
+from selenium import webdriver
+
+
+from utils import (
+    die,
+    log,
+    warn,
+)
+
+
+CAN_OVERWRITE = [
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+]
+
+
+def phantom_execute(script, args=None):
+    '''
+    This function runs a javascript snippet within the PhantomJS environment
+    It relies on this line found in phantom_init:
+
+        phantom.command_executor._commands['execute'] = (
+            'POST', '/session/$sessionId/phantom/execute')
+    '''
+
+    if args is None:
+        args = []
+    phantom.execute('execute', {'script': script, 'args': args})
+
+
+def download_og_image(url, output_path):
+    '''
+    Attempt to download an OpenGraph og:image
+    If that succeeds, this function will return true
+    '''
+
+    try:
+        html = requests.get(url).text
+    except requests.RequestException:
+        return
+
+    for element in BeautifulSoup(html, 'html.parser').select('meta[property=og:image]'):
+        ogimageurl = element.get('content')
+        if ogimageurl:
+            try:
+                r = requests.get(ogimageurl)
+            except requests.RequestException:
+                return
+            if r.status_code == 200:
+                with open(output_path, 'wb') as f:
+                    f.write(r.content)
+                    return True
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 3 or not validators.url(sys.argv[1]):
+        die('preview: Usage: {} SITE_URL OUTPUT_FILENAME'.format(os.path.basename(sys.argv[0])))
+
+    url, output_path = sys.argv[1:]
+
+    if os.path.isfile(output_path):
+        if magic.from_file(output_path, mime=True) not in CAN_OVERWRITE:
+            die('preview: refusing to overwrite "{}"!'.format(output_path))
+
+    if not download_og_image(url, output_path):
+        log('phantomjs: starting up...')
+
+        try:
+            phantom = webdriver.PhantomJS()
+            phantom.command_executor._commands['execute'] = ('POST', '/session/$sessionId/phantom/execute')
+            phantom.get(url)
+            phantom_execute('''
+                // Prevent transparent pages
+                this.evaluate(function() {{ document.body.bgColor = 'white'; }});
+                this.viewportSize = {{width: {w}, height: {h}}};
+                this.clipRect = {{top: 0, left: 0, width: {w}, height: {h}}};
+                this.render({json_output_path});
+                phantom.exit();
+            '''.format(w=1366, h=768, json_url=json.dumps(url), json_output_path=json.dumps(output_path)))
+        except HTTPException:
+            log('phantomjs: failed to fetch "{}"'.format(url))
+        else:
+            log('preview: converting preview image {}'.format(output_path))
+            subprocess.run(['convert', '-resize', '50%', output_path, output_path])
+
+        for c in psutil.Process().children():
+            if c.name() == 'phantomjs':
+                c.terminate()
+
+

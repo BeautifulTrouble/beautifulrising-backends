@@ -12,6 +12,7 @@ import re
 import sys
 from copy import deepcopy
 from datetime import datetime
+from hashlib import md5
 from itertools import zip_longest
 from pprint import pprint
 from string import capwords
@@ -133,9 +134,16 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
+        # TODO: There are better ways to make a relative path
+        asset_path_rel = self.config['asset-path'].lstrip('/')
+
+        rwe_pattern = 'rwe_{md5}_{slug:.32}.jpg'
+        rwe_is_generated = re.compile('rwe_[a-f0-9]{32}_').match
+
         language_default = self.config['language-default']
 
         module_types = [t['one'] for t in self.config['types-modules']]
+
         for content in all_content:
             if NEW in content:
                 # Add a module-type
@@ -145,23 +153,36 @@ class ContentLoader(object):
                         content['module-type'] = 'snapshot'
                     elif re.search('GALLERY', content['document_title']):
                         content['module-type'] = 'gallery'
+
                 # Clean up learn-more section
                 learn = content.get('learn-more')
                 if learn:
                     content['learn-more'] = [L for L in learn 
                         if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
+
                 # Clean up real-world-examples section
                 examples = content.get('real-world-examples')
                 if examples:
-                    content['real-world-examples'] = [e for e in examples if all(map(e.get, ['title','link','description']))]
+                    examples = [e for e in examples if all(map(e.get, ['title','link','description']))]
+                    for e in examples:
+                        if 'image' not in e or rwe_is_generated(e['image']):
+                            filename = rwe_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
+                            output_path = os.path.join(asset_path_rel, filename)
+                            e['image'] = filename
+                            log('siteprev: generating for "{}"'.format(e['title']))
+                            venv_run('sitepreview', e['link'], output_path)
+                    content['real-world-examples'] = examples
+
                 # Clean up some snapshots with example write ups
                 full_write_up = content.get('full-write-up')
                 if full_write_up and re.search(r'In a page \(500 words\) or less', full_write_up):
                     del content['full-write-up']
+
                 # Clean up some modules with example tags
                 tags = content.get('tags')
                 if tags and len(tags) == 3 and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
                     del content['tags']
+
                 # Produce a byline key
                 authors = content.get('authors')
                 if authors and content['lang'] == language_default:
