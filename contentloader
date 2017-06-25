@@ -557,8 +557,8 @@ class ContentLoader(object):
 
                 # Additional language labels provide API consumers with further detail explaining
                 # which keys of interest will contain fallback content in language_default
-                content['languages'] = {k: language if k in content else language_default
-                                        for k in language_label_keys}
+                content['lang-missing'] = [k for k in language_label_keys
+                                           if k not in content]
         return all_content
 
 
