@@ -193,7 +193,7 @@ def filter_output(resources):
                         resource[k] += [item for item in item_in_default_language if item not in resource[k]]
                 resource['lang'] = lang
         # List available languages
-        resource['langs'] = list(translations.keys() | {language_default})
+        resource['langs-available'] = list(translations.keys() | {language_default})
         
         # Remove private keys
         if 'type' in resource and resource['type'] in private_keys:
