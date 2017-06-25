@@ -507,6 +507,7 @@ class ContentLoader(object):
         language_suffixes = {'-'+lang for lang in langdetect.detector_factory._factory.langlist}
 
         language_default = self.config['language-default']
+        language_label_keys = self.config['language-label-keys']
         weighted_keys = {k for k in self.config['language-detection-weighted-keys']}
         omitted_keys = {'_id', '_rev', 'type', 'slug', 'timestamp', 'translations', 
                         'document_id', 'document_link', 'document_title'}
@@ -551,7 +552,13 @@ class ContentLoader(object):
                     except langdetect.lang_detect_exception.LangDetectException: ...
 
                 # And the best guess wins.
-                content['lang'] = max(lang + lang_weighted).lang
+                language = max(lang + lang_weighted).lang
+                content['lang'] = language
+
+                # Additional language labels provide API consumers with further detail explaining
+                # which keys of interest will contain fallback content in language_default
+                content['languages'] = {k: language if k in content else language_default
+                                        for k in language_label_keys}
         return all_content
 
 
