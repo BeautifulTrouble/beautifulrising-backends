@@ -507,7 +507,7 @@ class ContentLoader(object):
         language_suffixes = {'-'+lang for lang in langdetect.detector_factory._factory.langlist}
 
         language_default = self.config['language-default']
-        language_label_keys = self.config['language-label-keys']
+        language_mark_missing = self.config['language-mark-missing']
         weighted_keys = {k for k in self.config['language-detection-weighted-keys']}
         omitted_keys = {'_id', '_rev', 'type', 'slug', 'timestamp', 'translations', 
                         'document_id', 'document_link', 'document_title'}
@@ -557,8 +557,7 @@ class ContentLoader(object):
 
                 # Additional language labels provide API consumers with further detail explaining
                 # which keys of interest will contain fallback content in language_default
-                content['lang-missing'] = [k for k in language_label_keys
-                                           if k not in content]
+                content['lang-missing'] = [k for k in language_mark_missing if k not in content]
         return all_content
 
 
