@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #encoding: utf-8
 
+import copy
 import sys
 import json
 import random
@@ -14,6 +15,9 @@ try:
 
     from utils import *
     from config import *
+    from config import (
+        DRIVE_ROOT_FOLDER_NAME,
+    )
 
     assert len(sys.argv) >= 2
     assert not set(sys.argv) & {'-h', '--help'}
@@ -21,39 +25,107 @@ except (ImportError, AssertionError):
     sys.exit('This tool is meant to be invoked by the API server')
 
 
-# Common
+# General
 # ////////////////////////////////////////////////////////////////////////////
-def get_drive_root():
-    drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
-    return drive.folder(DRIVE_ROOT_FOLDER_NAME)
-
-
 def send_mail(to, subject, text):
+    if isinstance(to, str):
+        to = [to]
     try:
         r = requests.post('https://api.mailgun.net/v3/beautifulrising.org/messages',
             auth=('api', MAILGUN_API_KEY),
             data={'from': 'Beautiful Rising Web <noreply@beautifulrising.org>',
-                'to': [to], 'subject': subject, 'text': text})
+                'to': to, 'subject': subject, 'text': text})
     except requests.RequestException: r = None
     return r
 
 
-ARRAY_KEY = 'contributed'
-HEADER = '''
-    <style>
-        * { font-family: "Verdana"; }
-        .markup { font-weight: bold; font-size: 18pt; }
-        .disclaimer { color: #999999; font-style: italic; }
-    </style>
-    <h1>{{ title }}</h1>
-    <p class="disclaimer">
-        This document was produced automatically on %s by the beautifulrising.org
-        website. You can make careful changes to the <strong>[%s]</strong> list
-        below, but comments and any other text will be overwritten when the next
-        contribution is submitted.
-    </p>
-    <p>&nbsp;</p>
-''' % (time.strftime('%B %e, %Y'), ARRAY_KEY)
+# Docs
+# ////////////////////////////////////////////////////////////////////////////
+_root_folder = None
+
+def get_drive_root():
+    '''
+    Get the (cached) root folder specified in config.py by DRIVE_ROOT_FOLDER_NAME
+    '''
+    global _root_folder
+
+    if _root_folder is None:
+        drive = driveclient.DriveClient(DRIVE_CLIENT_NAME, service_account_json_filename=DRIVE_SERVICE_ACCOUNT_JSON_FILENAME)
+        _root_folder = drive.folder(DRIVE_ROOT_FOLDER_NAME)
+
+    return _root_folder
+
+
+def get_file_attribute(doc_name, attribute):
+    '''
+    Convenience function for getting an attribute from a drive file
+    '''
+    root = get_drive_root()
+    file = root.file(doc_name) or {}
+    attribute = getattr(file, attribute, '')
+    return attribute
+
+
+def add_to_doc(doc_name, ordering, dct):
+    '''
+    Given an ordered list of keys (the "requirements" list) and a dict of items
+    this will insert it into the ArchieML array of a google doc.
+    '''
+
+    ARRAY_KEY = 'content'
+    HEADER = '''
+        <style>
+            * { font-family: "Verdana"; }
+            .markup { font-weight: bold; font-size: 18pt; }
+            .disclaimer { color: #999999; font-style: italic; }
+        </style>
+        <h1>{{ title }}</h1>
+        <p class="disclaimer">
+            <strong>DO NOT MODIFY THIS DOCUMENT</strong>.
+            It was produced automatically on %s by the beautifulrising.org
+            website or one of its services.
+        </p>
+        <p>&nbsp;</p>
+    ''' % (time.strftime('%B %e, %Y'))
+
+    # Get any existing content
+    root = get_drive_root()
+    file = root.file(doc_name)
+    content = (parse_archieml(file.text) if file else {ARRAY_KEY: []}).get(ARRAY_KEY, [])
+    content.insert(0, dct)
+
+    # Prepare the template variables and render the template to the doc
+    title = fruit_salad(doc_name)
+    array = _archieml_array(ARRAY_KEY, ordering, content)
+    doc = root.write_html(doc_name, jinja2.Template(HEADER + array).render(**vars()))
+
+
+def _archieml_array(name, ordering, list_of_dicts):
+    '''
+    Produce an archieml array of dicts with html formatting (no one has written an
+    ArchieML serializer?!
+    '''
+    output = ''
+    for dct in list_of_dicts:
+        dct = copy.deepcopy(dct)
+        output += '<br>'
+        for k in ordering:
+            output += _archieml_key_value(key=k, value=dct.pop(k, ''))
+        if dct:
+            for k,v in sorted(dct.items()):
+                output += _archieml_key_value(key=k, value=v)
+    return ('<span class="markup">[%s]</span>{}<span class="markup">[]</span>' % name).format(output)
+
+
+def _archieml_key_value(key, value):
+    '''
+    Produce an archieml key:value pair with html formatting, preserving multiline strings
+    '''
+    # The text representation contains extra newlines, so replace them in pairs first
+    if '\n' in value:
+        value = value.replace('\n\n', '<br>').replace('\n', '<br>') 
+        value += '<br>:<strong>end</strong>'
+    return jinja2.Template('<strong>{{ key }}</strong>: {{ value }}<br>').render(**vars())
 
 
 def fruit_salad(string):
@@ -66,63 +138,29 @@ def fruit_salad(string):
                    for i,c in enumerate(string))
 
 
-# ArchieML Output (no one seems to have written a library to produce it!)
-# ////////////////////////////////////////////////////////////////////////////
-def archieml_key_value(key, value):
-    '''
-    Produce an archieml key:value pair with html formatting, preserving multiline strings
-    '''
-    # The text representation contains extra newlines, so replace them in pairs first
-    if '\n' in value:
-        value = value.replace('\n\n', '<br>').replace('\n', '<br>') 
-        value += '<br>:<strong>end</strong>'
-    return jinja2.Template('<strong>{{ key }}</strong>: {{ value }}<br>').render(**vars())
-
-
-def archieml_array(list_of_dicts, key_ordering=[]):
-    '''
-    Produce an archieml array with html formatting
-    '''
-    output = ''
-    for dct in list_of_dicts:
-        output += '<br>'
-        for k in key_ordering:
-            output += archieml_key_value(key=k, value=dct.pop(k, ''))
-        if dct:
-            for k,v in sorted(dct.items()):
-                output += archieml_key_value(key=k, value=v)
-    return ('<span class="markup">[%s]</span>{}<span class="markup">[]</span>' % ARRAY_KEY).format(output)
-
-
 # Intake Handlers
 # ////////////////////////////////////////////////////////////////////////////
 def handle_real_world_examples(requirements, form, notification_emails):
-    doc_title = 'Real World Examples'
-
-    # Load the drive doc containing contributed real world examples
-    root = get_drive_root()
-
-    # Parse any existing content
-    file = root.file(doc_title)
-    content = (parse_archieml(file.text) if file else {}).get(ARRAY_KEY, [])
-    content.insert(0, form)
-
-    # Link the document_links
-    for entry in content:
-        document_link = entry.get('document_link')
-        if document_link:
-            entry['document_link'] = '<a href="{0}">{0}</a>'.format(document_link)
-
-    # Prepare the template variables and render the template to the doc
-    title = fruit_salad(doc_title)
-    array = archieml_array(content, requirements)
-    doc = root.write_html(doc_title, jinja2.Template(HEADER + array).render(**vars()))
+    doc_name = 'Contributed Real World Examples'
+    add_to_doc(doc_name, requirements, form)
 
     # Send email notification of the contribution
-    send_mail(notification_emails, 'A new real world example has been contributed', 'Have a look: ' + doc.alternateLink)
+    output_link = get_file_attribute(doc_name, 'alternateLink')
+    send_mail(notification_emails, 'A new real world example has been contributed',
+        'Have a look: ' + output_link)
 
 
-def handle_contributor_question(requirements, form):
+def handle_newsfeed_suggestion(requirements, form, notification_emails):
+    doc_name = 'Contributed Newsfeed Suggestions'
+    add_to_doc(doc_name, requirements, form)
+
+    # Send email notification of the contribution
+    output_link = get_file_attribute(doc_name, 'alternateLink')
+    send_mail(notification_emails, 'A new newsfeed suggestion has been contributed',
+        'The suggestion was "{}". Have a look at all suggestions: {}'.format(form.get('suggestion'), output_link))
+
+
+def handle_contributor_question(requirements, form, notification_emails):
     contributor = form['contributor']
     question = form['question']
     url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
@@ -131,9 +169,9 @@ def handle_contributor_question(requirements, form):
         contributor_email = j.get('email', '')
         contributor_name = j.get('title', '')
     except requests.RequestException:
-        send_mail(ADMIN_EMAIL, "This BR question for {} failed to send".format(contributor), question)
+        send_mail(notification_emails, "This BR question for {} failed to send".format(contributor), question)
     else:
-        send_mail(ADMIN_EMAIL, "A Beautiful Rising user asked {}...".format(contributor_name), question)
+        send_mail(notification_emails, "A Beautiful Rising user asked {}...".format(contributor_name), question)
         if contributor_email:
             send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
 

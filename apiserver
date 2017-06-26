@@ -135,15 +135,14 @@ def intake(feature):
         'real-world-examples': ['document_title', 'document_link', 'title', 'link', 'description'],
         'newsfeed-suggestion': ['suggestion'],
     }
-    feature_extra = {
-        'real-world-examples': lambda: config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
-    }
     body = request.get_json()
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
         requirements = feature_requirements.get(feature)
         if requirements is not None and all(body.get(item) for item in requirements):
-            extra = feature_extra.get(feature, lambda: None)()
-            args = (json.dumps(i) for i in (requirements, body, extra) if i)
+            extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
+            if DEBUG:
+                extra = [ADMIN_EMAIL]
+            args = map(json.dumps, (requirements, body, extra))
             venv_run('intakehandler', feature, *args)
             return '', 204
     return 'Validation failed', 400
