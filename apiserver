@@ -11,6 +11,7 @@ from urllib.parse import urlparse, unquote
 
 import couchdb
 import requests
+from cerberus import Validator
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, url_for
 from flask_compress import Compress
@@ -111,6 +112,9 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
     '''
     Validate a recaptcha from form data. Always returns True if DEBUG is True.
     '''
+    if DEBUG:
+        return True
+
     if recaptcha_version == 'v2':
         log('recaptcha: v2')
         secret = RECAPTCHA_V2_SITE_SECRET
@@ -119,7 +123,7 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
         secret = RECAPTCHA_INVISIBLE_SITE_SECRET
 
     try:
-        return DEBUG or requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
+        return requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
             'secret': secret,
             'response': recaptcha_response,
             'remoteip': request.remote_addr,
@@ -131,18 +135,29 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
-        'contributor-question': ['contributor', 'question'],
-        'real-world-examples': ['document_title', 'document_link', 'title', 'link', 'description'],
-        'newsfeed-suggestion': ['suggestion'],
+        'contributor-question': Validator({
+            'contributors': {'type': 'list', 'schema': {'type': 'string'}},
+            'question': {'type': 'string'},
+        }),
+        'real-world-examples': Validator({
+            'document_title': {'type': 'string'},
+            'document_link': {'type': 'string'},
+            'title': {'type': 'string'},
+            'link': {'type': 'string'},
+            'description': {'type': 'string'},
+        }),
+        'newsfeed-suggestion': Validator({
+            'suggestion': {'type': 'string'},
+        }),
     }
     body = request.get_json()
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
-        requirements = feature_requirements.get(feature)
-        if requirements is not None and all(body.get(item) for item in requirements):
+        validator = feature_requirements.get(feature)
+        if validator is not None and validator.validate(body):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
             if DEBUG:
                 extra = [ADMIN_EMAIL]
-            args = map(json.dumps, (requirements, body, extra))
+            args = map(json.dumps, (body, extra))
             venv_run('intakehandler', feature, *args)
             return '', 204
     return 'Validation failed', 400

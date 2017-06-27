@@ -66,10 +66,9 @@ def get_file_attribute(doc_name, attribute):
     return attribute
 
 
-def add_to_doc(doc_name, ordering, dct):
+def add_to_doc(doc_name, dct):
     '''
-    Given an ordered list of keys (the "requirements" list) and a dict of items
-    this will insert it into the ArchieML array of a google doc.
+    Insert dct into the ArchieML array of a google doc called doc_name
     '''
 
     ARRAY_KEY = 'content'
@@ -96,11 +95,11 @@ def add_to_doc(doc_name, ordering, dct):
 
     # Prepare the template variables and render the template to the doc
     title = fruit_salad(doc_name)
-    array = _archieml_array(ARRAY_KEY, ordering, content)
+    array = _archieml_array(ARRAY_KEY, content)
     doc = root.write_html(doc_name, jinja2.Template(HEADER + array).render(**vars()))
 
 
-def _archieml_array(name, ordering, list_of_dicts):
+def _archieml_array(name, list_of_dicts):
     '''
     Produce an archieml array of dicts with html formatting (no one has written an
     ArchieML serializer?!
@@ -109,7 +108,8 @@ def _archieml_array(name, ordering, list_of_dicts):
     for dct in list_of_dicts:
         dct = copy.deepcopy(dct)
         output += '<br>'
-        for k in ordering:
+        keys = sorted(dct)
+        for k in keys:
             output += _archieml_key_value(key=k, value=dct.pop(k, ''))
         if dct:
             for k,v in sorted(dct.items()):
@@ -140,9 +140,9 @@ def fruit_salad(string):
 
 # Intake Handlers
 # ////////////////////////////////////////////////////////////////////////////
-def handle_real_world_examples(requirements, form, notification_emails):
+def handle_real_world_examples(form, notification_emails):
     doc_name = 'Contributed Real World Examples'
-    add_to_doc(doc_name, requirements, form)
+    add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
     output_link = get_file_attribute(doc_name, 'alternateLink')
@@ -150,9 +150,9 @@ def handle_real_world_examples(requirements, form, notification_emails):
         'Have a look: ' + output_link)
 
 
-def handle_newsfeed_suggestion(requirements, form, notification_emails):
+def handle_newsfeed_suggestion(form, notification_emails):
     doc_name = 'Contributed Newsfeed Suggestions'
-    add_to_doc(doc_name, requirements, form)
+    add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
     output_link = get_file_attribute(doc_name, 'alternateLink')
@@ -160,20 +160,24 @@ def handle_newsfeed_suggestion(requirements, form, notification_emails):
         'The suggestion was "{}". Have a look at all suggestions: {}'.format(form.get('suggestion'), output_link))
 
 
-def handle_contributor_question(requirements, form, notification_emails):
-    contributor = form['contributor']
+def handle_contributor_question(form, notification_emails):
     question = form['question']
-    url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
-    try:
-        j = requests.get(url, headers={'x-api-admin-token': API_ADMIN_TOKEN}).json()
-        contributor_email = j.get('email', '')
-        contributor_name = j.get('title', '')
-    except requests.RequestException:
-        send_mail(notification_emails, "This BR question for {} failed to send".format(contributor), question)
-    else:
-        send_mail(notification_emails, "A Beautiful Rising user asked {}...".format(contributor_name), question)
+    contributors = form['contributors']
+
+    for contributor in contributors:
+        url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
+        try:
+            j = requests.get(url, headers={'x-api-admin-token': API_ADMIN_TOKEN}).json()
+            contributor_email = j.get('email', '')
+            contributor_name = j.get('title', contributor)
+        except requests.RequestException:
+            send_mail(notification_emails,
+                "Failed to send question to Beautiful Rising contributor {}".format(contributor), question)
         if contributor_email:
             send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
+        send_mail(notification_emails, 'A Beautiful Rising user asked {}...'.format(contributor_name), question)
+
+    #TODO: More context for questions
 
 
 # When properly invoked, call an appropriate handle_* function
