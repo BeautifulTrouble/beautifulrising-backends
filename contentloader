@@ -119,30 +119,37 @@ class ContentLoader(object):
             all_content = list(existing_content.values())
             all_content = self.add_language_tags(all_content)
 
-            all_content = self.custom_filters(all_content)
+            all_content = self.pre_filters(all_content)
 
             all_content = self.merge_translations(all_content)
             all_content = self.fix_relationships(all_content)
 
-            all_content = self.xref_links(all_content)
+            all_content = self.post_filters(all_content)
 
             self.download_assets()
             self.db_save(all_content)
 
 
-    def custom_filters(self, all_content):
+    def pre_filters(self, all_content):
         '''
         Project-specific filtering 
         '''
         # TODO: There are better ways to make a relative path
         asset_path_rel = self.config['asset-path'].lstrip('/')
 
-        rwe_pattern = 'rwe_{md5}_{slug:.32}.jpg'
+        rwe_file_pattern = 'rwe_{md5}_{slug:.32}.jpg'
         rwe_is_generated = re.compile('rwe_[a-f0-9]{32}_').match
+
+        # There are about 12 more dashes in unicode, but we'll support these
+        # five for key-whatever modules and call it a day. This regex handles
+        # incorrect spacing around the hyphens, Arabic hyphens and more!
+        key_pattern = r'(?P<module>.+?)(?:{}[][)(]*[-—–―ـ]\s+|\s+[-—–―ـ]\s+)(?P<description>.+)'
+        key_finder = re.compile(key_pattern.format(ARABIC_BOUNDARY_REGEX)).findall
 
         language_default = self.config['language-default']
 
         module_types = [t['one'] for t in self.config['types-modules']]
+        module_types_plural = [t['many'] for t in self.config['types-modules']]
 
         for content in all_content:
             if NEW in content:
@@ -166,7 +173,7 @@ class ContentLoader(object):
                     examples = [e for e in examples if all(map(e.get, ['title','link','description']))]
                     for e in examples:
                         if 'image' not in e or rwe_is_generated(e['image']):
-                            filename = rwe_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
+                            filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
                             output_path = os.path.join(asset_path_rel, filename)
                             e['image'] = filename
                             log('siteprev: generating for "{}"'.format(e['title']))
@@ -197,10 +204,19 @@ class ContentLoader(object):
                         content['byline'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
                         content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
                         content['byline-ar'] = ' \u0648 '.join(authors)
+
+                # Simplify the key-stuff
+                # TODO: Slugify these 
+                content['key'] = {}
+                for module_type in module_types_plural:
+                    key_name = 'key-' + module_type
+                    if key_name in content:
+                        content['key'][key_name] = [result[0] for result in (key_finder(k) for k in content[key_name]) if result]
+
         return all_content
 
 
-    def xref_links(self, all_content):
+    def post_filters(self, all_content):
         '''
         As a final step, iterate through all modules and patch up module links
         '''
@@ -279,6 +295,7 @@ class ContentLoader(object):
                             c[field] = visit_all(c.get(field))
 
                 # This should be the last time the NEW marker is needed
+                # NOTE these remain in the translated pieces unless removed here
                 c.pop(NEW, None)
 
         return all_content
