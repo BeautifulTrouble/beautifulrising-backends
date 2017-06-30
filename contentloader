@@ -10,6 +10,7 @@ import math
 import os
 import re
 import sys
+import time
 from copy import deepcopy
 from datetime import datetime
 from hashlib import md5
@@ -223,7 +224,13 @@ class ContentLoader(object):
         language_all = self.config['language-all']
         language_default = self.config['language-default']
         markdown_fields = self.config['markdown']
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http).+)\)').search
+        # This regex isn't pefect, but should work for 99% of our cases. The
+        # problem relates to detecting nested parens without a proper parser.
+        # This solution just swallows any ending with an extra close paren.
+        # Since the link text is fuzzy matched anyway, we don't need to reliably
+        # capture the full link text. However, if any module names end up with
+        # parens in their middles "Like (such as) this", this method will fail.
+        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
         xrefpat = self.config['xref-link-pattern']
 
         # Ideally these strings would live in some kind of configurable

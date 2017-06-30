@@ -19,9 +19,9 @@ DEVELOP = '--develop' in sys.argv
 
 
 # Regex word boundaries don't work with Arabic characters, so any regex which
-# leverages the \b will fail to work. The string B_REGEX can be interpolated
-# within any such regex for a (fingers crossed) drop-in replacement of \b.
-# Credit for the idea of using positive lookbehind assertions goes to
+# leverages the \b will fail to work. The string ARABIC_BOUNDARY_REGEX can be
+# interpolated within a regex as a (fingers crossed) drop-in replacement for
+# a \b. Credit for the idea of using positive lookbehind assertions goes to
 # http://www.rexegg.com/regex-boundaries.html#real-word-boundary
 ARABIC_RANGES = r'\u0600-\u06ff\u0750-\u077f\ufb50-\ufbc1\ufbd3-\ufd3f'\
                 r'\ufd49-\ufd8f\ufd92-\ufdc7\ufe70-\ufefc\ufdf0-\ufdfd'
