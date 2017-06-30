@@ -208,11 +208,11 @@ class ContentLoader(object):
 
                 # Simplify the key-stuff
                 # TODO: Slugify these 
-                content['key'] = {}
+                content['key-modules'] = {}
                 for module_type in module_types_plural:
                     key_name = 'key-' + module_type
                     if key_name in content:
-                        content['key'][key_name] = [result[0] for result in (key_finder(k) for k in content[key_name]) if result]
+                        content['key-modules'][key_name] = [result[0] for result in (key_finder(k) for k in content[key_name]) if result]
 
         return all_content
 
