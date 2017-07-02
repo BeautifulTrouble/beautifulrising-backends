@@ -178,6 +178,7 @@ def filter_output(resources):
     language_all = config['language-all']
     language_add = config['language-add']
     language_default = config['language-default']
+    language_mark_missing = config['language-mark-missing']
     language_remove = config['language-remove']
 
     # Get one valid language no matter what
@@ -194,20 +195,37 @@ def filter_output(resources):
 
     output = []
     for resource in resources:
-        # In the default language simply removing the translations is enough
+        # Remove the translations for overlaying or discarding
         translations = resource.pop('translations', {})
-        if translations:
-            # In translated languages merge data using language-add and language-remove config items
-            if lang in translations:
-                preserved = {k:v for k,v in resource.items() if k in language_add}
-                resource.update({k:v for k,v in translations[lang].items() if k not in language_remove})
-                for k,item_in_default_language in preserved.items():
-                    # Merge one level of nested lists
-                    if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
-                        resource[k] += [item for item in item_in_default_language if item not in resource[k]]
-                resource['lang'] = lang
+        translated = translations.get(lang)
+
         # List available languages
         resource['langs-available'] = list(translations.keys() | {language_default})
+
+        if lang == language_default:
+            # In the default language simply mark missing keys
+            resource['lang-missing'] = [k for k in language_mark_missing if not resource.get(k)]
+
+        elif translated:
+            # In other languages mark missing keys before interleaving & merging
+            resource['lang-missing'] = [k for k in language_mark_missing if not translated.get(k)]
+            # Hold these items to be re-added after resource.update
+            preserved = {k:v for k,v in resource.items() if k in language_add}
+            # Default language content it here overwritten with translated content
+            resource.update({k:v for k,v in translated.items() if k not in language_remove})
+            # Preserved content (from language_add keys) is here added back in
+            for k,item_in_default_language in preserved.items():
+                # Merge one level of nested lists
+                if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
+                    resource[k] += [item for item in item_in_default_language if item not in resource[k]]
+            # I believe this sets lang for pieces where the translations were created
+            # artificially (using suffixed keys) and lang isn't present. If that's the
+            # case it probably belongs in the contentloader
+            resource['lang'] = lang
+
+        else:
+            # This is an untranslated piece
+            resource['lang-missing'] = language_mark_missing
         
         # Remove private keys
         if 'type' in resource and resource['type'] in private_keys:
@@ -215,6 +233,7 @@ def filter_output(resources):
                 resource.pop(key, None)
         resource.pop('private', None)
 
+        # XXX: How does output differ from resources?
         output.append(resource)
 
     # Return an dict or list of dicts as appropriate
@@ -301,6 +320,6 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 # Run when invoked from the command line
 # ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':
-    app.run(port=6000, debug=DEBUG)
+    app.run(port=6000 + DEBUG, debug=DEBUG)
 
 
