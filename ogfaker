@@ -10,6 +10,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from jinja2 import Template
 
+from utils import (
+    DEBUG,
+)
 from config import (
     # TODO: Use more granular limits per task
     API_GENERAL_LIMIT,
@@ -43,9 +46,9 @@ limiter = Limiter(app, key_func=get_remote_address)
 
 # TODO: endpoint for /en /es /ar
 
-@app.route('/', defaults={'path', ''})
-@app.route('/<path:path>')
-def fake_any(path):
+@app.route('/')
+@app.route('/<path>')
+def fake_any(path=''):
     return template
 
 
@@ -56,4 +59,4 @@ def fake_tool(slug):
 
 
 if __name__ == '__main__':
-    app.run(port=6002)
+    app.run(port=6002, debug=DEBUG)
