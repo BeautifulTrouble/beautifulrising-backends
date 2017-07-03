@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+#encoding: utf-8
+
+# Auto-install and activate a virtualenv if possible
+import autovenv
+autovenv.run()
+
+from flask import Flask
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from jinja2 import Template
+
+from config import (
+    # TODO: Use more granular limits per task
+    API_GENERAL_LIMIT,
+)
+
+
+template = '''
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Beautiful Rising</title>
+        <meta charset="utf-8">
+        <meta property="og:title" content="Beautiful Rising" />
+        <meta property="og:description" content="Beautiful Rising seeks to strengthen the capacity, creativity, and effectiveness of social movements, activist groups, and civil society organizations to achieve lasting social change." />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://beautifulrising.org/" />
+        <meta property="og:image" content="https://beautifulrising.org/promo.jpg" />
+        <meta property="og:site_name" content="Beautiful Rising" />
+        <meta name="twitter:site" content="@beautrising" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:image:src" content="https://beautifulrising.org/promo.jpg" />
+    </head>
+    <body></body>
+</html>
+'''
+
+
+app = Flask(__name__)
+limiter = Limiter(app, key_func=get_remote_address)
+
+
+# TODO: endpoint for /en /es /ar
+
+@app.route('/', defaults={'path', ''})
+@app.route('/<path:path>')
+def fake_any(path):
+    return template
+
+
+@app.route('/tool/<slug>', methods=['GET'])
+@limiter.limit(API_GENERAL_LIMIT)
+def fake_tool(slug):
+    return template
+
+
+if __name__ == '__main__':
+    app.run(port=6002)
