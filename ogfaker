@@ -5,35 +5,53 @@
 import autovenv
 autovenv.run()
 
+import multiprocessing
+
+import json
+import requests
+import time
 from flask import Flask
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from jinja2 import Template
+from plucky import plucks
 
 from utils import (
     DEBUG,
+    log,
+    script_directory,
 )
 from config import (
+    API_CACHE_FILE,
+    API_CACHE_LIFESPAN,
     # TODO: Use more granular limits per task
     API_GENERAL_LIMIT,
+    API_SERVER,
+    API_PATH,
 )
+
+
+# Web server should rewrite urls from certain UA's with this prefix
+PREFIX = '/opengraph/'
+ALL_PATH = '{}{}/all'.format(API_SERVER, API_PATH)
+CONFIG_PATH = '{}{}/config'.format(API_SERVER, API_PATH)
 
 
 template = '''
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Beautiful Rising</title>
+        <title>{title}</title>
         <meta charset="utf-8">
-        <meta property="og:title" content="Beautiful Rising" />
-        <meta property="og:description" content="Beautiful Rising seeks to strengthen the capacity, creativity, and effectiveness of social movements, activist groups, and civil society organizations to achieve lasting social change." />
+        <meta property="og:title" content="{title}" />
+        <meta property="og:description" content="{tagline}" />
         <meta property="og:type" content="article" />
-        <meta property="og:url" content="https://beautifulrising.org/{}" />
-        <meta property="og:image" content="https://beautifulrising.org/promo.jpg" />
-        <meta property="og:site_name" content="Beautiful Rising" />
+        <meta property="og:url" content="https://beautifulrising.org/{path}" />
+        <meta property="og:image" content="https://beautifulrising.org/{image}" />
+        <meta property="og:site_name" content="{site_title}" />
         <meta name="twitter:site" content="@beautrising" />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:image:src" content="https://beautifulrising.org/promo.jpg" />
+        <meta name="twitter:image:src" content="https://beautifulrising.org/{image}" />
     </head>
     <body></body>
 </html>
@@ -44,19 +62,70 @@ app = Flask(__name__)
 limiter = Limiter(app, key_func=get_remote_address)
 
 
-# TODO: endpoint for /en /es /ar
+def cache_content():
+    '''
+    Periodically cache API content for performance
+    TODO: This would be useful to a number of microservices so it should
+          probably be moved to a general purpose task
+    '''
+    while True:
+        data = {}
+        config = requests.get(CONFIG_PATH).json()
+        for language in config.get('language-all', ['en']):
+            data[language] = requests.get('{}?lang={}'.format(ALL_PATH, language)).json()
+        with script_directory():
+            with open(API_CACHE_FILE, 'w') as f:
+                json.dump(data, f)
+        log('apicache: sleeping for {} seconds'.format(API_CACHE_LIFESPAN))
+        time.sleep(API_CACHE_LIFESPAN)
 
-@app.route('/')
-@app.route('/<path>')
+
+def get_cache(language):
+    with script_directory():
+        with open(API_CACHE_FILE) as f:
+            data = json.load(f)
+            content = data.get(language, data.get('en'))
+    return content
+
+
+def get_title_tagline_image(content):
+    ui = by_slug(content, 'ui')
+    promo = by_slug(content, 'promo')
+    return plucks(ui, 'misc.site-title'), promo.get('tagline', ''), promo.get('image', '')
+
+
+def by_slug(content, slug):
+    for item in content:
+        if item.get('slug') == slug:
+            return item
+    return {}
+
+
+@app.route(PREFIX)
+@app.route(PREFIX + '<path:path>')
 def fake_any(path=''):
-    return template.format(path)
+    content = get_cache(lang)
+
+    title, tagline, image = get_title_tagline_image(content)
+    return template.format(title=title, site_title=title, tagline=tagline,
+        image=image, path=path)
 
 
-@app.route('/tool/<slug>', methods=['GET'])
+@app.route(PREFIX + 'tool/<slug>', methods=['GET'])
+@app.route(PREFIX + '<string(length=2):lang>/tool/<slug>', methods=['GET'])
 @limiter.limit(API_GENERAL_LIMIT)
-def fake_tool(slug):
-    return template.format('/tool/'+slug)
+def fake_tool(lang='en', slug=''):
+    content = get_cache(lang)
+    tool = by_slug(content, slug)
+
+    site_title, tagline, image = get_title_tagline_image(content)
+    title = tool.get('title', '')
+    image = tool.get('image', image)
+    path = '{}/tool/{}'.format(lang, slug)
+    return template.format(title=title, site_title=site_title, tagline=tagline,
+        image=image, path=path)
 
 
 if __name__ == '__main__':
+    multiprocessing.Process(target=cache_content).start()
     app.run(port=6002, debug=DEBUG)
