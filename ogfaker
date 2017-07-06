@@ -108,6 +108,9 @@ def fake_any(lang='', path=''):
     content = get_cache(lang)
 
     title, tagline, image = get_title_tagline_image(content)
+    if lang:
+        path = '{}/{}'.format(lang, path)
+
     return template.format(title=title, site_title=title, tagline=tagline,
         image=image, path=path)
 
@@ -120,9 +123,12 @@ def fake_tool(lang='', slug=''):
     tool = by_slug(content, slug)
 
     site_title, tagline, image = get_title_tagline_image(content)
-    title = tool.get('title', site_title)
+
     image = tool.get('image', image)
     tagline = tool.get('snapshot', tagline)
+    title = tool.get('title', site_title)
+    if title != site_title:
+        title = '{}: {}'.format(site_title, title)
 
     path = 'tool/{}'.format(slug)
     if lang:
