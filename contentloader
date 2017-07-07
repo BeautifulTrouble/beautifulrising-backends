@@ -280,6 +280,7 @@ class ContentLoader(object):
         # Recursive visitor reaches all deeply nested strings
         visit_all = lambda x: {
             list:   lambda L: [visit_all(i) for i in L],
+            tuple:  lambda t: [visit_all(i) for i in t],
             dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
             str:    lambda s: patch_links(s),
             int:    lambda i: i,
