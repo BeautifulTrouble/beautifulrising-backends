@@ -163,23 +163,23 @@ class ContentLoader(object):
                         content['module-type'] = 'gallery'
 
                 # Clean up learn-more section
-                learn = content.get('learn-more')
-                if learn:
-                    content['learn-more'] = [L for L in learn 
-                        if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
+                content['learn-more'] = [L for L in content.get('learn-more', [])
+                    if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
+                if not content['learn-more']:
+                    del content['learn-more']
 
                 # Clean up real-world-examples section
-                examples = content.get('real-world-examples')
-                if examples:
-                    examples = [e for e in examples if all(map(e.get, ['title','link','description']))]
-                    for e in examples:
-                        if 'image' not in e or rwe_is_generated(e['image']):
-                            filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
-                            output_path = os.path.join(asset_path_rel, filename)
-                            e['image'] = filename
-                            log('siteprev: generating for "{}"'.format(e['title']))
-                            venv_run('sitepreview', e['link'], output_path)
-                    content['real-world-examples'] = examples
+                content['real-world-examples'] = [e for e in content.get('real-world-examples', [])
+                                                  if all(map(e.get, ['title','link','description']))]
+                for e in content['real-world-examples']:
+                    if 'image' not in e or rwe_is_generated(e['image']):
+                        filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
+                        output_path = os.path.join(asset_path_rel, filename)
+                        e['image'] = filename
+                        log('siteprev: generating for "{}"'.format(e['title']))
+                        venv_run('sitepreview', e['link'], output_path)
+                if not content['real-world-examples']:
+                    del content['real-world-examples']
 
                 # Clean up some snapshots with example write ups
                 full_write_up = content.get('full-write-up')
@@ -213,6 +213,8 @@ class ContentLoader(object):
                     key_name = 'key-' + module_type
                     if key_name in content:
                         content['key-modules'][key_name] = [result[0] for result in (key_finder(k) for k in content[key_name]) if result]
+                if not content['key-modules']:
+                    del content['key-modules']
 
         return all_content
 
