@@ -194,7 +194,7 @@ def filter_output(resources):
         'lang', 'type', 'title', 'slug', 'timestamp',
         'document_id', 'document_link', 'document_title',
         # Added during custom filtering
-        'key-modules', 'byline'
+        'byline'
     }
 
     # Get one valid language no matter what
