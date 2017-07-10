@@ -365,6 +365,6 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 # ////////////////////////////////////////////////////////////////////////////
 
 if __name__ == '__main__':
-    app.run(port=6000 + DEBUG, debug=DEBUG)
+    app.run(port=6000 + DEBUG + DEVELOP, debug=DEBUG)
 
 
