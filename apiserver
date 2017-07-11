@@ -272,6 +272,10 @@ def filter_output(resources):
                 module_type_effective = 'snapshot'
             if 'snapshot' in lang_missing:
                 module_type_effective = 'untranslated'
+                # This relates to the comment above about the lang attribute. An underlying
+                # assumption here might be that an untranslated piece means the original is
+                # in English and that is not necessarily always true.
+                resource['lang'] = language_default
             resource['module-type-effective'] = module_type_effective
 
         # List available languages
@@ -365,6 +369,6 @@ api.add_resource(Endpoints, '/'.format(**vars()))
 # ////////////////////////////////////////////////////////////////////////////
 
 if __name__ == '__main__':
-    app.run(port=6000 + DEBUG, debug=DEBUG)
+    app.run(port=6000 + DEBUG + DEVELOP, debug=DEBUG)
 
 
