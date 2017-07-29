@@ -497,7 +497,11 @@ class ContentLoader(object):
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
-        content['timestamp'] = int(1000 * parser.parse(content.get('date', document.modifiedDate)).timestamp())
+        try:
+            dt = parser.parse(content['date'])
+        except: # Easier to ask forgiveness...
+            dt = parser.parse(document.modifiedDate)
+        content['timestamp'] = int(1000 * dt.timestamp())
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():
