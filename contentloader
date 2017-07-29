@@ -13,6 +13,7 @@ import sys
 import time
 from copy import deepcopy
 from datetime import datetime
+from dateutil import parser
 from hashlib import md5
 from itertools import zip_longest
 from pprint import pprint
@@ -493,10 +494,10 @@ class ContentLoader(object):
 
         # Add a few useful bits
         content['slug'] = slugify(content.get('title', ''), allow=':')
-        content['timestamp'] = int(1000 * datetime.strptime(document.modifiedDate, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp())
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
+        content['timestamp'] = int(1000 * parser.parse(content.get('date', document.modifiedDate)).timestamp())
 
         # Convert singular keys to plural keys and split them up as lists
         for plural_key,singular_key in self.config['plural-keys'].items():
@@ -670,7 +671,10 @@ class ContentLoader(object):
             for field,doc_type in forward.items():
                 related_titles = content.get(field)
                 if related_titles is not None:
-                    possibly_related_docs = typed_content.get(doc_type, [])
+                    if doc_type == 'any':
+                        possibly_related_docs = all_content
+                    else:
+                        possibly_related_docs = typed_content.get(doc_type, [])
                     if isinstance(related_titles, list):
                         # Ignore leading hyphens when sorting (Is this sort redundant? Prove it before removing!)
                         content[field] = sorted((c['slug'] for c in
