@@ -165,8 +165,7 @@ class ContentLoader(object):
 
                 # Clean up learn-more section
                 content['learn-more'] = [L for L in content.get('learn-more', [])
-                    if ( (L.get('title') and L.get('link')) or (L.get('title') and L.get('source')) )
-                    and L.get('title') != 'abc' and L.get('link') != 'url']
+                    if L.get('title') and L.get('link') and L.get('title') != 'abc' and L.get('link') != 'url']
                 if not content['learn-more']:
                     del content['learn-more']
 
