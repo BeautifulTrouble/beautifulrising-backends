@@ -104,7 +104,7 @@ class ContentLoader(object):
 
             # Identify published documents by their filenames and fetch new content
             published = re.compile(self.config['published-filename-regex']).search
-            published_documents = (d for d in self.get_documents() if published(d.title))
+            published_documents = (d for d in self.get_documents() if published(d.title) or d.id in self.options.ids)
             new_content = filter(None, map(self.extract_and_transform, published_documents))
 
             # TODO: detect duplicate names
