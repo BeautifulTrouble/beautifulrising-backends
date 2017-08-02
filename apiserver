@@ -290,7 +290,7 @@ def filter_output(resources):
 
     # Allow sorting by query param 'orderby=keyname' (if possible)
     if request.args.get('orderby'):
-        reverse = request.args.get('reverse').lower() == 'true'
+        reverse = request.args.get('reverse', '').lower() == 'true'
         try:
             ig = itemgetter(request.args['orderby'])
             output = sorted(output, key=ig, reverse=reverse)
