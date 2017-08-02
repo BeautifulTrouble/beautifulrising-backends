@@ -286,7 +286,8 @@ def filter_output(resources):
 
     # Return an dict or list of dicts as appropriate
     if single:
-        return output or {}
+        output = output or [{}]
+        return output[0]
 
     # Allow sorting by query param 'orderby=keyname' (if possible)
     if request.args.get('orderby'):
