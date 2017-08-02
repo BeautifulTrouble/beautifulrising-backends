@@ -371,10 +371,10 @@ api.add_resource(Config, '{API_PATH}/config'.format(**vars()))
 class Endpoints(Resource):
     def get(self):
         return {rule.endpoint: {
-                'url': unquote(url_for(rule.endpoint, **{a: '[{}]'.format(a) for a in rule.arguments})),
+                'url': unquote(url_for(rule.endpoint, **{a: '<{}>'.format(a) for a in rule.arguments})),
                 'methods': list(rule.methods),
             } for rule in app.url_map.iter_rules()}
-api.add_resource(Endpoints, '/'.format(**vars()))
+api.add_resource(Endpoints, '{API_PATH}'.format(**vars()))
 
 
 # Run when invoked from the command line
