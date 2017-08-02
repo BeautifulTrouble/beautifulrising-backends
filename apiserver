@@ -286,11 +286,12 @@ def filter_output(resources):
 
     # Return an dict or list of dicts as appropriate
     if single:
-        return output or {}
+        output = output or [{}]
+        return output[0]
 
     # Allow sorting by query param 'orderby=keyname' (if possible)
     if request.args.get('orderby'):
-        reverse = request.args.get('reverse', '').lower() == 'true'
+        reverse = request.args.get('reverse').lower() == 'true'
         try:
             ig = itemgetter(request.args['orderby'])
             output = sorted(output, key=ig, reverse=reverse)
