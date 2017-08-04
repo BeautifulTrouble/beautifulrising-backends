@@ -156,6 +156,11 @@ def intake(feature):
         'newsfeed-suggestion': Validator({
             'suggestion': {'type': 'string'},
         }),
+        'resource-suggestion': Validator({
+            'title': {'type': 'string'},
+            'link': {'type': 'string'},
+            'description': {'type': 'string'},
+        }),
     }
     body = request.get_json()
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
