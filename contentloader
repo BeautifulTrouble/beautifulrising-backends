@@ -136,6 +136,8 @@ class ContentLoader(object):
         '''
         Project-specific filtering 
         '''
+        log('filters: preprocessing unmerged docs')
+
         # TODO: There are better ways to make a relative path
         asset_path_rel = self.config['asset-path'].lstrip('/')
 
@@ -192,21 +194,6 @@ class ContentLoader(object):
                 if tags and len(tags) == 3 and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
                     del content['tags']
 
-                # Produce a byline key
-                authors = content.get('authors')
-                if authors and content['lang'] == language_default:
-                    authors = sorted(authors)
-                    if len(authors) == 1:
-                        content['byline'] = authors[0]
-                    elif len(authors) == 2:
-                        content['byline'] = ' and '.join(authors)
-                        content['byline-es'] = ' y '.join(authors)
-                        content['byline-ar'] = ' \u0648 '.join(authors)
-                    else:
-                        content['byline'] = ', '.join(authors[:-1]) + ', and ' + authors[-1]
-                        content['byline-es'] = ', '.join(authors[:-1]) + ', y ' + authors[-1]
-                        content['byline-ar'] = ' \u0648 '.join(authors)
-
                 # Simplify the key-stuff
                 # TODO: Slugify these 
                 content['key-modules'] = {}
@@ -222,11 +209,40 @@ class ContentLoader(object):
 
     def post_filters(self, all_content):
         '''
-        As a final step, iterate through all modules and patch up module links
+        As a final step, iterate through all modules, patch up module links
+        and add bylines for simplicity
         '''
+        log('filters: postprocessing merged docs')
+
         language_all = self.config['language-all']
         language_default = self.config['language-default']
-        markdown_fields = self.config['markdown']
+
+        # Produce byline field for each language
+        language_joiners = {
+            'en': [', ', ' and '],
+            'es': [', ', ' y '],
+            'ar': [' \u0648 ', ' \u0648 '],
+        }
+        content_by_slug = {c['slug']: c for c in all_content}
+        for content in all_content:
+            author_content = [content_by_slug[a] for a in content.get('authors', [])]
+            if author_content:
+                author_by_lang = {lang: [a['translations'].get(lang, {}).get('title', a['title']) for a in author_content]
+                                  for lang in language_all}
+                for lang, authors in author_by_lang.items():
+                    join_mid, join_last = language_joiners[lang]
+                    if len(authors) == 1:
+                        byline = authors[0]
+                    elif len(authors) == 2:
+                        byline = join_last.join(authors)
+                    else:
+                        byline = join_mid.join(authors[:-1]) + join_last + authors[-1]
+
+                    if lang == language_default:
+                        content['byline'] = byline
+                    elif lang in content['translations']:
+                        content['translations'][lang]['byline'] = byline
+
         # This regex isn't pefect, but should work for 99% of our cases. The
         # problem relates to detecting nested parens without a proper parser.
         # This solution just swallows any ending with an extra close paren.
@@ -235,6 +251,7 @@ class ContentLoader(object):
         # parens in their middles "Like (such as) this", this method will fail.
         matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
         xrefpat = self.config['xref-link-pattern']
+        markdown_fields = self.config['markdown']
 
         # Ideally these strings would live in some kind of configurable
         # place, but time constraints make that a low-priority
