@@ -56,12 +56,15 @@ def get_drive_root():
     return _root_folder
 
 
-def get_file_attribute(doc_name, attribute):
+def get_file_attribute(doc_or_name, attribute):
     '''
     Convenience function for getting an attribute from a drive file
     '''
-    root = get_drive_root()
-    file = root.file(doc_name) or {}
+    if isinstance(doc_or_name, str):
+        root = get_drive_root()
+        file = root.file(doc_name)
+    else:
+        file = doc_or_name
     attribute = getattr(file, attribute, '')
     return attribute
 
@@ -97,6 +100,7 @@ def add_to_doc(doc_name, dct):
     title = fruit_salad(doc_name)
     array = _archieml_array(ARRAY_KEY, content)
     doc = root.write_html(doc_name, jinja2.Template(HEADER + array).render(**vars()))
+    return doc
 
 
 def _archieml_array(name, list_of_dicts):
@@ -142,30 +146,30 @@ def fruit_salad(string):
 # ////////////////////////////////////////////////////////////////////////////
 def handle_real_world_examples(form, notification_emails):
     doc_name = 'Contributed Real World Examples'
-    add_to_doc(doc_name, form)
+    doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
-    output_link = get_file_attribute(doc_name, 'alternateLink')
+    output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new real world example has been contributed',
         'Have a look: ' + output_link)
 
 
 def handle_newsfeed_suggestion(form, notification_emails):
     doc_name = 'Contributed Newsfeed Suggestions'
-    add_to_doc(doc_name, form)
+    doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
-    output_link = get_file_attribute(doc_name, 'alternateLink')
+    output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new newsfeed suggestion has been contributed',
         'The suggestion was "{}". Have a look at all suggestions: {}'.format(form.get('suggestion'), output_link))
 
 
 def handle_resource_suggestion(form, notification_emails):
     doc_name = 'Contributed Resource Suggestions'
-    add_to_doc(doc_name, form)
+    doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
-    output_link = get_file_attribute(doc_name, 'alternateLink')
+    output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new resource suggestion has been contributed',
         'The resource was "{}". Have a look at all suggestions: {}'.format(form.get('title'), output_link))
 
