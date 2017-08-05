@@ -6,6 +6,7 @@ autovenv.run()
 
 import json
 import os
+import pprint
 import re
 import sys
 from operator import attrgetter, itemgetter
@@ -143,23 +144,23 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 def intake(feature):
     feature_requirements = {
         'contributor-question': Validator({
-            'contributors': {'type': 'list', 'schema': {'type': 'string'}},
-            'question': {'type': 'string'},
+            'contributors':     {'type': 'list', 'schema': {'type': 'string'}},
+            'question':         {'type': 'string', 'required': True},
         }),
         'real-world-examples': Validator({
-            'document_title': {'type': 'string'},
-            'document_link': {'type': 'string'},
-            'title': {'type': 'string'},
-            'link': {'type': 'string'},
-            'description': {'type': 'string'},
+            'document_title':   {'type': 'string', 'required': True},
+            'document_link':    {'type': 'string', 'required': True},
+            'title':            {'type': 'string', 'required': True},
+            'link':             {'type': 'string', 'required': True},
+            'description':      {'type': 'string', 'required': True},
         }),
         'newsfeed-suggestion': Validator({
-            'suggestion': {'type': 'string'},
+            'suggestion':       {'type': 'string', 'required': True},
         }),
         'resource-suggestion': Validator({
-            'title': {'type': 'string'},
-            'link': {'type': 'string'},
-            'description': {'type': 'string'},
+            'title':            {'type': 'string', 'required': True},
+            'link':             {'type': 'string', 'required': True},
+            'description':      {'type': 'string', 'required': True},
         }),
     }
     body = request.get_json()
@@ -172,7 +173,8 @@ def intake(feature):
             args = map(json.dumps, (body, extra))
             venv_run('intakehandler', feature, *args)
             return '', 204
-    return 'Validation failed', 400
+    schema = pprint.pformat(dict(validator.schema))
+    return 'Validation Failed. Use reCAPTCHA and the following schema:\n{}'.format(schema), 400
 
 
 # Output filtering
