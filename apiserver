@@ -298,11 +298,18 @@ def filter_output(resources):
 
     # Allow sorting by query param 'orderby=keyname' (if possible)
     if request.args.get('orderby'):
-        reverse = request.args.get('reverse').lower() == 'true'
+        reverse = request.args.get('reverse', '').lower() == 'true'
         try:
             ig = itemgetter(request.args['orderby'])
             output = sorted(output, key=ig, reverse=reverse)
         except: pass
+
+    # Allow basic pagination by query params 'limit=N_per_page&page=N'
+    try:
+        limit = abs(int(request.args.get('limit')))
+        page = abs(int(request.args.get('page', 1)))
+        output = output[(page-1) * limit: (page-1) * limit + limit]
+    except: pass
 
     return output
 
