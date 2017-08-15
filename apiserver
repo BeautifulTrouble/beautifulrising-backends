@@ -304,11 +304,16 @@ def filter_output(resources):
     except: pass
 
     # Allow basic pagination by query params 'limit=N_per_page&page=N'
+    # A sentinel value of [current_page, total_pages] appears at the end
     try:
         limit = abs(int(request.args['limit']))
         page = abs(int(request.args.get('page', 1)))
-        output = output[(page-1) * limit: (page-1) * limit + limit]
+        total = len(output) // limit + bool(len(output) % limit)
+        output = output[(page-1) * limit: (page-1) * limit + limit] + [[page, total]]
     except: pass
+    else:
+        if not 0 < page <= total:
+            raise NotFound
 
     return output
 
