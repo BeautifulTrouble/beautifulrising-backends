@@ -20,3 +20,4 @@ selenium
 unidecode
 validators
 cerberus
+pyicu
