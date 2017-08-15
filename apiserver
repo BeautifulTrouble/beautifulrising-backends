@@ -9,6 +9,7 @@ import os
 import pprint
 import re
 import sys
+from functools import cmp_to_key
 from operator import attrgetter, itemgetter
 from urllib.parse import urlparse, unquote
 
@@ -21,6 +22,7 @@ from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_restful import Resource, Api
+from icu import Locale, RuleBasedCollator
 from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import *
@@ -183,6 +185,10 @@ def intake(feature):
 # Used for setting module-type
 module_types = [t['one'] for t in config['types-modules']]
 
+# Cache the locale-specific comparator key functions
+comparators = {L: cmp_to_key(RuleBasedCollator.createInstance(Locale(L)).compare)
+               for L in config['language-all']}
+
 def filter_output(resources):
     '''
     Filter the output by language, merge x-language keys, and hide keys
@@ -298,10 +304,12 @@ def filter_output(resources):
 
     # Allow sorting by query param 'orderby=keyname' (if possible)
     try:
-        ig = itemgetter(request.args['orderby'])
+        orderby = request.args.get('orderby', 'title')
+        keyfunc = lambda obj: comparators[lang](str(obj.get(orderby, '')))
         reverse = request.args.get('reverse', '').lower() == 'true'
-        output = sorted(output, key=ig, reverse=reverse)
-    except: pass
+        output = sorted(output, key=keyfunc, reverse=reverse)
+    except:
+        warn('api: ?orderby= failed: {}'.format(dict(request.args)))
 
     # Allow basic pagination by query params 'limit=N_per_page&page=N'
     # A sentinel value of [current_page, total_pages] appears at the end
@@ -310,7 +318,8 @@ def filter_output(resources):
         page = abs(int(request.args.get('page', 1)))
         total = len(output) // limit + bool(len(output) % limit)
         output = output[(page-1) * limit: (page-1) * limit + limit] + [[page, total]]
-    except: pass
+    except:
+        warn('api: ?limit= failed: {}'.format(dict(request.args)))
     else:
         if not 0 < page <= total:
             raise NotFound
