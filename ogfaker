@@ -103,13 +103,16 @@ def by_slug(content, slug):
 
 @app.route(PREFIX)
 @app.route(PREFIX + '<string(length=2):lang>/<path:path>')
+@app.route(PREFIX + '<string(length=2):lang>')
 @app.route(PREFIX + '<path:path>')
 def fake_any(lang='', path=''):
     content = get_cache(lang)
 
     title, tagline, image = get_title_tagline_image(content)
-    if lang:
+    if lang and path:
         path = '{}/{}'.format(lang, path)
+    elif lang:
+        path = lang
 
     return template.format(title=title, site_title=title, tagline=tagline,
         image=image, path=path)
