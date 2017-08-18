@@ -333,15 +333,18 @@ class ContentLoader(object):
         '''
         Use fuzzy matching to find a content item from a list
         This should always return a dict
+
+        XXX: If item_list has changed since the last time it was cached, this function
+             can return an item which is no longer in item_list. A source of strange bugs.
         '''
         if not isinstance(item_name, str):
             return {}
-        cached = fuzzy_match_cache.get(item_name)
+        cached = fuzzy_match_cache.setdefault(id(item_list), {}).get(item_name)
         if cached:
             return cached
         match = fuzzy(item_name, item_list, processor=lambda m: m.get('title', ''))
         if match and match[1] >= thresh:
-            fuzzy_match_cache[item_name] = match[0]
+            fuzzy_match_cache[id(item_list)][item_name] = match[0]
             return match[0]
         return {}
 
@@ -697,9 +700,8 @@ class ContentLoader(object):
                         possibly_related_docs = typed_content.get(doc_type, [])
                     if isinstance(related_titles, list):
                         # Ignore leading hyphens when sorting (Is this sort redundant? Prove it before removing!)
-                        content[field] = sorted((c['slug'] for c in
-                            (slugged_content.get(t) or self.find_content(t, possibly_related_docs, 90)
-                             for t in related_titles) if c), key=lambda s: s.lstrip('-'))
+                        content[field] = sorted((c['slug'] for c in (self.find_content(t, possibly_related_docs, 90) for t in related_titles) if c),
+                            key=lambda s: s.lstrip('-'))
                     elif isinstance(related_titles, str):
                         content[field] = self.find_content(related_titles, possibly_related_docs, 90).get('slug')
                     if not content[field]:
@@ -710,23 +712,24 @@ class ContentLoader(object):
         # specifies two things:
         #   1. The fields containing forward relationships so that forward related docs can be found
         #   2. A mapping of types to the fields which, in those related docs, need to be related back
-        backward_groups = [(g.keys(), {v: k for k,v in g.items()}) for g in self.config['relationships']['backward']]
+        backward_groups = [(g, {v: k for k, v in g.items()}) for g in self.config['relationships']['backward']]
         for content in all_content:
             slug = content['slug']
-            # Each of these ([field, ...], {type:field}) pairs represents a group of interrelated content
-            for fields,types_to_fields in backward_groups:
+            # Each of these ({field:type}, {type:field}) pairs represents a group of interrelated content
+            for fields_to_types, types_to_fields in backward_groups:
                 # Field relating back to this type
                 field_back = types_to_fields.get(content['type'])
                 if field_back:
                     # Iterate through everything ~this~ doc relates to and get those docs
                     related_docs = []
-                    for field in fields:
+                    for field in fields_to_types:
                         related_slugs = content.get(field)
                         if related_slugs:
                             if isinstance(related_slugs, str):
                                 related_slugs = [related_slugs]
                             if isinstance(related_slugs, list):
                                 related_docs.extend([*filter(None, (slugged_content.get(s) for s in related_slugs))])
+
                     # Now add the backward relationship to every doc
                     for doc in related_docs:
                         backward_field = doc.get(field_back)
