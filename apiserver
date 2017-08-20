@@ -307,8 +307,7 @@ def filter_output(resources, limit_related_hack=False):
             for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
                 limited = [i for i in resource.get(field, []) if i in valid]
                 random.shuffle(limited)
-                if limited:
-                    resource[field] = limited[:5]
+                resource[field] = limited[:5] or []
 
     # Return an dict or list of dicts as appropriate
     if single:
