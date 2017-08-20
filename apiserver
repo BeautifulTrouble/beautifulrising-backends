@@ -305,9 +305,10 @@ def filter_output(resources, limit_related_hack=False):
         valid = [i['slug'] for i in output if i.get('module-type-effective') in ('gallery', 'full')]
         for resource in output:
             for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
-                limited = [i for i in resource.get(field, []) if i in valid]
-                random.shuffle(limited)
-                resource[field] = limited[:5] or []
+                if field in resource:
+                    limited = [i for i in resource[field] if i in valid]
+                    random.shuffle(limited)
+                    resource[field] = limited[:5]
 
     # Return an dict or list of dicts as appropriate
     if single:
