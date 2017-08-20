@@ -7,8 +7,10 @@ autovenv.run()
 import json
 import os
 import pprint
+import random
 import re
 import sys
+import time
 from functools import cmp_to_key
 from operator import attrgetter, itemgetter
 from urllib.parse import urlparse, unquote
@@ -189,7 +191,7 @@ module_types = [t['one'] for t in config['types-modules']]
 comparators = {L: cmp_to_key(RuleBasedCollator.createInstance(Locale(L)).compare)
                for L in config['language-all']}
 
-def filter_output(resources):
+def filter_output(resources, limit_related_hack=False):
     '''
     Filter the output by language, merge x-language keys, and hide keys
     '''
@@ -297,6 +299,17 @@ def filter_output(resources):
 
         output.append(resource)
 
+    # Related module HACK (this needs to be in the front end!)
+    if limit_related_hack:
+        log('hack: limiting related modules (PLEASE MOVE THIS TO THE FRONT END!)')
+        valid = [i['slug'] for i in output if i.get('module-type-effective') in ('gallery', 'full')]
+        for resource in output:
+            for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
+                limited = [i for i in resource.get(field, []) if i in valid]
+                random.shuffle(limited)
+                if limited:
+                    resource[field] = limited[:5]
+
     # Return an dict or list of dicts as appropriate
     if single:
         output = output or [{}]
@@ -380,7 +393,7 @@ class All(Resource):
     query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
         try:
-            return filter_output([doc['value'] for doc in db.query(self.query)])
+            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack=True)
         except (KeyError, ResourceNotFound): raise NotFound
 api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
 
