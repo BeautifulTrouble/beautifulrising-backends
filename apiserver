@@ -223,7 +223,7 @@ def filter_output(resources, limit_related_hack=False):
     if request.headers.get('x-api-admin-token') == API_ADMIN_TOKEN:
         private_keys = {}
     else:
-        private_keys = {T['one']: T['private'].split() for T in config['types'] if 'private' in T}
+        private_keys = {T['one']: T['private'] for T in config['types'] if 'private' in T}
 
     output = []
     for resource in resources:
