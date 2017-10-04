@@ -302,13 +302,20 @@ def filter_output(resources, limit_related_hack=0):
     # Related module HACK (this needs to be in the front end!)
     if limit_related_hack:
         log('hack: randomizing & limiting related modules (Please move to front-end!)')
-        valid = [i['slug'] for i in output if i.get('module-type-effective')]
+        snapshots = {i['slug'] for i in output if i.get('module-type-effective') == 'snapshot'}
+        non_snapshots = {i['slug'] for i in output if i.get('module-type-effective') in ('gallery', 'full')}
         for resource in output:
             for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
                 if field in resource:
-                    limited = [i for i in resource[field] if i in valid]
-                    random.shuffle(limited)
-                    resource[field] = limited[:limit_related_hack]
+                    related = set(resource[field])
+                    new_related = list(related & non_snapshots)
+
+                    if len(new_related) < limit_related_hack:
+                        snaps = related & snapshots
+                        new_related += random.sample(snaps, min(len(snaps), limit_related_hack - len(new_related)))
+
+                    random.shuffle(new_related)
+                    resource[field] = new_related[:limit_related_hack]
 
     # Return an dict or list of dicts as appropriate
     if single:
