@@ -398,7 +398,7 @@ class All(Resource):
     query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
         try:
-            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack='no-snapshots')
+            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack='snapshots')
         except (KeyError, ResourceNotFound): raise NotFound
 api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
 
