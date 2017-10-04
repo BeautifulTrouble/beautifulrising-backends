@@ -60,7 +60,7 @@ class ContentLoader(object):
 
         # Connect to couchdb
         self.couch = couchdb.Server(DB_SERVER)
-        self.db = self.couch[DB_NAME] if DB_NAME in self.couch else self.couch.create(DB_NAME)
+        self.db_get_or_create()
 
         # Connect to Google Drive and get the root folder
         self.drive = driveclient.DriveClient(DRIVE_CLIENT_NAME,
@@ -347,6 +347,14 @@ class ContentLoader(object):
             fuzzy_match_cache[id(item_list)][item_name] = match[0]
             return match[0]
         return {}
+
+
+    def db_get_or_create(self):
+        '''
+        Get the database, creating if necessary
+        '''
+        self.db = self.couch[DB_NAME] if DB_NAME in self.couch else self.couch.create(DB_NAME)
+        return self.db
 
 
     def db_save(self, doc_or_docs):
