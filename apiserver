@@ -191,7 +191,7 @@ module_types = [t['one'] for t in config['types-modules']]
 comparators = {L: cmp_to_key(RuleBasedCollator.createInstance(Locale(L)).compare)
                for L in config['language-all']}
 
-def filter_output(resources, limit_related_hack=None):
+def filter_output(resources, limit_related_hack=0):
     '''
     Filter the output by language, merge x-language keys, and hide keys
     '''
@@ -301,19 +301,14 @@ def filter_output(resources, limit_related_hack=None):
 
     # Related module HACK (this needs to be in the front end!)
     if limit_related_hack:
-        if limit_related_hack == 'no-snapshots':
-            log('hack: limiting related module quantity & types (MOVE THIS TO THE FRONT END!)')
-            valid_module_types = 'full', 'gallery'
-        else:
-            log('hack: limiting related module quantity (MOVE THIS TO THE FRONT END!)')
-            valid_module_types = 'full', 'gallery', 'snapshot'
-        valid = [i['slug'] for i in output if i.get('module-type-effective') in valid_module_types]
+        log('hack: randomizing & limiting related modules (Please move to front-end!)')
+        valid = [i['slug'] for i in output if i.get('module-type-effective')]
         for resource in output:
             for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
                 if field in resource:
                     limited = [i for i in resource[field] if i in valid]
                     random.shuffle(limited)
-                    resource[field] = limited[:5]
+                    resource[field] = limited[:limit_related_hack]
 
     # Return an dict or list of dicts as appropriate
     if single:
@@ -398,7 +393,7 @@ class All(Resource):
     query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
         try:
-            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack='snapshots')
+            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack=5)
         except (KeyError, ResourceNotFound): raise NotFound
 api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
 
