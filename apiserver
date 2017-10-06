@@ -9,6 +9,7 @@ import os
 import pprint
 import random
 import re
+import string
 import sys
 import time
 from functools import cmp_to_key
@@ -187,9 +188,9 @@ def intake(feature):
 # Used for setting module-type
 module_types = [t['one'] for t in config['types-modules']]
 
-# Cache the locale-specific comparator key functions
-comparators = {L: cmp_to_key(RuleBasedCollator.createInstance(Locale(L)).compare)
-               for L in config['language-all']}
+# Clean strings of punctuation for better ordering
+punctuation_table = str.maketrans('', '', string.punctuation + '“‘’”')
+cleaned_string = lambda i: str(i or '').translate(punctuation_table)
 
 def filter_output(resources, limit_related_hack=0):
     '''
@@ -325,7 +326,8 @@ def filter_output(resources, limit_related_hack=0):
     # Allow sorting by query param 'orderby=keyname' (if possible)
     try:
         orderby = request.args.get('orderby', 'title')
-        keyfunc = lambda obj: comparators[lang](str(obj.get(orderby, '')))
+        compare = RuleBasedCollator.createInstance(Locale(lang)).compare
+        keyfunc = cmp_to_key(lambda a, b: compare(cleaned_string(a.get(orderby)), cleaned_string(b.get(orderby))))
         reverse = request.args.get('reverse', '').lower() == 'true'
         output = sorted(output, key=keyfunc, reverse=reverse)
     except: pass
