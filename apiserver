@@ -189,7 +189,7 @@ def intake(feature):
 module_types = [t['one'] for t in config['types-modules']]
 
 # Clean strings of punctuation for better ordering
-punctuation_table = str.maketrans('', '', string.punctuation + '“‘’”')
+punctuation_table = str.maketrans('', '', string.punctuation + '¿¡‘’“”')
 cleaned_string = lambda i: str(i or '').translate(punctuation_table)
 
 def filter_output(resources, limit_related_hack=0):
