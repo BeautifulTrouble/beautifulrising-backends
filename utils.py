@@ -92,13 +92,13 @@ def only_one_process(name=None):
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
-def venv_run(path, *args):
+def venv_run(path, *args, **kwargs):
     '''
     Convenience function for running a python process within the same virtualenv
     as the caller. If relative, the path is relative to this script's directory.
     '''
     with script_directory():
-        return Popen([sys.executable, path, *args]).pid
+        return Popen([sys.executable, path, *args], **kwargs).pid
 
 
 def parse_archieml(text):
