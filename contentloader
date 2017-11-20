@@ -249,8 +249,8 @@ class ContentLoader(object):
         # Since the link text is fuzzy matched anyway, we don't need to reliably
         # capture the full link text. However, if any module names end up with
         # parens in their middles "Like (such as) this", this method will fail.
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
-        xrefpat = self.config['xref-link-pattern']
+        xref_matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
+        xref_pat = self.config['xref-link-pattern']
         markdown_fields = self.config['markdown']
 
         # Ideally these strings would live in some kind of configurable
@@ -270,14 +270,14 @@ class ContentLoader(object):
         }
 
         def patch_links(text):
-            m, chunks = matcher(text), []
+            m, chunks = xref_matcher(text), []
             while m:
                 link_text, module_name, _, end = *m.groups(), *m.span()
                 # TODO: ensure this gets the right language, even on a fresh load
                 content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
-                        replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
+                        replacement = '[%s]({})'.format(xref_pat) % (link_text, content['slug'])
                     else:
                         if language == language_default:
                             link_text = nest_parens(content['title'], 1)
@@ -288,13 +288,13 @@ class ContentLoader(object):
                             except KeyError:
                                 link_text = nest_parens(content['title'], 1)
                         type_name = types[language][content['type']].upper()
-                        replacement = xref_fmt_strings[language].format(xrefpat) % (type_name, link_text, content['slug'])
+                        replacement = xref_fmt_strings[language].format(xref_pat) % (type_name, link_text, content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 else:
                     #TODO: do something clever when a x-refed module is missing?
                     chunks.append(text[:end])
                 text = text[end:]
-                m = matcher(text)
+                m = xref_matcher(text)
             return ''.join(chunks) + text
 
         # Recursive visitor reaches all deeply nested strings
