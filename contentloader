@@ -306,27 +306,57 @@ class ContentLoader(object):
             int:    lambda i: i,
         }[dict if isinstance(x, dict) else type(x)](x)
 
+
+        # Create a mapping of titles to slugs
+        slugs_by_title = {}
+        for content in all_content:
+            slugs_by_title[content['title']] = content['slug']
+            for c in content['translations'].values():
+                if 'title' in c:
+                    slugs_by_title[c['title']] = content['slug']
+        titles = slugs_by_title.keys()
+
+        # This final pass through all nested content patches up xrefs and key-modules
         for content in all_content:
             language = content['lang']
+            # Add slugs to key-modules
+            if 'key-modules' in content:
+                for key_group in content['key-modules'].values():
+                    for i, k in enumerate(key_group):
+                        key_group[i] = list(k[:2]) + [slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')]
+            # Process xref links in markdown fields
             if NEW in content and language in language_all:
                 for field in self.config['markdown']:
                     if content.get(field):
                         content[field] = visit_all(content.get(field))
-
             # This should be the last time the NEW marker is needed
             content.pop(NEW, None)
 
             for language, c in content['translations'].items():
+                # Add slugs to nested key-modules
+                if 'key-modules' in c:
+                    for key_group in c['key-modules'].values():
+                        for i, k in enumerate(key_group):
+                            key_group[i] = list(k[:2]) + [slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')]
+                # Process xref links in markdown fields
                 if NEW in c and language in language_all:
                     for field in self.config['markdown']:
                         if c.get(field):
                             c[field] = visit_all(c.get(field))
-
                 # This should be the last time the NEW marker is needed
                 # NOTE these remain in the translated pieces unless removed here
                 c.pop(NEW, None)
 
         return all_content
+
+
+    def find_fuzzy(self, title, title_list, thresh=50):
+        '''
+        General-purpose fuzzy matcher
+        '''
+        match = fuzzy(title, title_list)
+        if match and match[1] >= thresh:
+            return match[0]
 
 
     def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}):
