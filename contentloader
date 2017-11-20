@@ -249,8 +249,8 @@ class ContentLoader(object):
         # Since the link text is fuzzy matched anyway, we don't need to reliably
         # capture the full link text. However, if any module names end up with
         # parens in their middles "Like (such as) this", this method will fail.
-        matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
-        xrefpat = self.config['xref-link-pattern']
+        xref_matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
+        xref_pat = self.config['xref-link-pattern']
         markdown_fields = self.config['markdown']
 
         # Ideally these strings would live in some kind of configurable
@@ -270,14 +270,14 @@ class ContentLoader(object):
         }
 
         def patch_links(text):
-            m, chunks = matcher(text), []
+            m, chunks = xref_matcher(text), []
             while m:
                 link_text, module_name, _, end = *m.groups(), *m.span()
                 # TODO: ensure this gets the right language, even on a fresh load
                 content = self.find_content(module_name, all_content, thresh=90)
                 if content:
                     if link_text:
-                        replacement = '[%s]({})'.format(xrefpat) % (link_text, content['slug'])
+                        replacement = '[%s]({})'.format(xref_pat) % (link_text, content['slug'])
                     else:
                         if language == language_default:
                             link_text = nest_parens(content['title'], 1)
@@ -288,13 +288,13 @@ class ContentLoader(object):
                             except KeyError:
                                 link_text = nest_parens(content['title'], 1)
                         type_name = types[language][content['type']].upper()
-                        replacement = xref_fmt_strings[language].format(xrefpat) % (type_name, link_text, content['slug'])
+                        replacement = xref_fmt_strings[language].format(xref_pat) % (type_name, link_text, content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 else:
                     #TODO: do something clever when a x-refed module is missing?
                     chunks.append(text[:end])
                 text = text[end:]
-                m = matcher(text)
+                m = xref_matcher(text)
             return ''.join(chunks) + text
 
         # Recursive visitor reaches all deeply nested strings
@@ -306,27 +306,57 @@ class ContentLoader(object):
             int:    lambda i: i,
         }[dict if isinstance(x, dict) else type(x)](x)
 
+
+        # Create a mapping of titles to slugs
+        slugs_by_title = {}
+        for content in all_content:
+            slugs_by_title[content['title']] = content['slug']
+            for c in content['translations'].values():
+                if 'title' in c:
+                    slugs_by_title[c['title']] = content['slug']
+        titles = slugs_by_title.keys()
+
+        # This final pass through all nested content patches up xrefs and key-modules
         for content in all_content:
             language = content['lang']
+            # Add slugs to key-modules
+            if 'key-modules' in content:
+                for key_group in content['key-modules'].values():
+                    for i, k in enumerate(key_group):
+                        key_group[i] = list(k[:2]) + [slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')]
+            # Process xref links in markdown fields
             if NEW in content and language in language_all:
                 for field in self.config['markdown']:
                     if content.get(field):
                         content[field] = visit_all(content.get(field))
-
             # This should be the last time the NEW marker is needed
             content.pop(NEW, None)
 
             for language, c in content['translations'].items():
+                # Add slugs to nested key-modules
+                if 'key-modules' in c:
+                    for key_group in c['key-modules'].values():
+                        for i, k in enumerate(key_group):
+                            key_group[i] = list(k[:2]) + [slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')]
+                # Process xref links in markdown fields
                 if NEW in c and language in language_all:
                     for field in self.config['markdown']:
                         if c.get(field):
                             c[field] = visit_all(c.get(field))
-
                 # This should be the last time the NEW marker is needed
                 # NOTE these remain in the translated pieces unless removed here
                 c.pop(NEW, None)
 
         return all_content
+
+
+    def find_fuzzy(self, title, title_list, thresh=50):
+        '''
+        General-purpose fuzzy matcher
+        '''
+        match = fuzzy(title, title_list)
+        if match and match[1] >= thresh:
+            return match[0]
 
 
     def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}):
