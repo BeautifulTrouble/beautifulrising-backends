@@ -98,7 +98,10 @@ def venv_run(path, *args, **kwargs):
     as the caller. If relative, the path is relative to this script's directory.
     '''
     with script_directory():
-        return Popen([sys.executable, path, *args], **kwargs).pid
+        try:
+            return Popen([sys.executable, path, *args], **kwargs).pid
+        except OSError as e:
+            print(e)
 
 
 def parse_archieml(text):
