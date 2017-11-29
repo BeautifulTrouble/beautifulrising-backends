@@ -28,6 +28,7 @@ from config import (
     API_GENERAL_LIMIT,
     API_SERVER,
     API_PATH,
+    FB_APP_ID,
 )
 
 
@@ -43,6 +44,7 @@ template = '''
     <head>
         <title>{title}</title>
         <meta charset="utf-8">
+        <meta property="fb:app_id" content="%s" />
         <meta property="og:title" content="{title}" />
         <meta property="og:description" content="{tagline}" />
         <meta property="og:type" content="article" />
@@ -55,7 +57,7 @@ template = '''
     </head>
     <body></body>
 </html>
-'''
+''' % FB_APP_ID
 
 
 app = Flask(__name__)
