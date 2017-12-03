@@ -168,8 +168,8 @@ def intake(feature):
             'description':      {'type': 'string', 'required': True},
         }),
     }
-    body = request.get_json()
-    if body and recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
+    body = request.get_json() or {}
+    if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
         validator = feature_requirements.get(feature)
         if validator is not None and validator.validate(body):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
