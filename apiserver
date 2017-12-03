@@ -169,7 +169,7 @@ def intake(feature):
         }),
     }
     body = request.get_json()
-    if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
+    if body and recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
         validator = feature_requirements.get(feature)
         if validator is not None and validator.validate(body):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
@@ -179,7 +179,7 @@ def intake(feature):
             venv_run('intakehandler', feature, *args)
             return '', 204
     schema = pprint.pformat(dict(validator.schema))
-    return 'Validation Failed. Use reCAPTCHA and the following schema:\n{}'.format(schema), 400
+    return 'Validation Failed. Use reCAPTCHA and the following json schema:\n{}'.format(schema), 400
 
 
 # Output filtering
