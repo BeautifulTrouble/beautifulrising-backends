@@ -168,10 +168,12 @@ def intake(feature):
             'description':      {'type': 'string', 'required': True},
         }),
     }
-    body = request.get_json() or {}
+    body = request.get_json()
     validator = feature_requirements.get(feature)
+    if not body:
+        return 'Please provide json in the body of the request', 400
     if not validator:
-        return 'No such intake endpoint.', 404
+        return 'No such intake endpoint', 404
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
         if validator.validate(body):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
