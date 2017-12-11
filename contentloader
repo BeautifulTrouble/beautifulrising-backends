@@ -550,7 +550,7 @@ class ContentLoader(object):
             return
 
         # Add a few useful bits
-        content['slug'] = slugify(content.get('title', ''), allow=':')
+        content['slug'] = slugify(content.get('title', ''), allow='')
         content['document_id'] = document.id
         content['document_link'] = document.alternateLink
         content['document_title'] = document.title
