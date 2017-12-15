@@ -9,6 +9,7 @@ import argparse
 import math
 import os
 import re
+import shlex
 import sys
 import time
 from copy import deepcopy
@@ -439,8 +440,7 @@ class ContentLoader(object):
         # Download top-level assets from this top-level folder to this (relative) local path
         c.setdefault('asset-sources', ['ASSETS'])
         c.setdefault('asset-path', '/assets/content')
-        c.setdefault('asset-image-sizes', {})
-        c.setdefault('asset-image-quality', '85%')
+        c.setdefault('asset-manipulation', {})
         # Content type information
         c['types'] = []
         for key,value in c.items():
@@ -799,13 +799,9 @@ class ContentLoader(object):
                         convert = True
                     if convert and file.attributes['mimeType'] in ('image/png', 'image/jpeg'):
                         log('convert: asset "{}"'.format(file.title))
-                        for prefix,width in self.config['asset-image-sizes'].items():
-                            Popen([
-                                'convert', 
-                                '-quality', self.config['asset-image-quality'], 
-                                '-resize', width + 'x', 
-                                file.title, prefix + file.title
-                            ])
+                        for prefix,args in self.config['asset-manipulation'].items():
+                            Popen(['convert', *shlex.split(args),
+                                   file.title, '{}-{}'.format(prefix, file.title)])
 
 
 if __name__ == '__main__':
