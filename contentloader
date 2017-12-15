@@ -800,7 +800,6 @@ class ContentLoader(object):
                     if convert and file.attributes['mimeType'] in ('image/png', 'image/jpeg'):
                         log('convert: asset "{}"'.format(file.title))
                         for prefix,args in self.config['asset-manipulation'].items():
-                            print(shlex.split(args))
                             Popen(['convert', *shlex.split(args),
                                    file.title, '{}-{}'.format(prefix, file.title)])
 
