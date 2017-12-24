@@ -348,7 +348,9 @@ def pdf(request_type):
 
         elif request_type == 'download':
             pdf = make_pdf(modules, lang, size, unique_hash)
-            return Response(pdf, mimetype='application/pdf')
+            return Response(pdf, mimetype='application/pdf', headers={
+                'Content-Disposition': 'attachment; filename="beautifulrising-{}.pdf"'.format(unique_hash[:5])
+            })
 
     raise BadRequest
 
