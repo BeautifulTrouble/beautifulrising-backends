@@ -307,10 +307,11 @@ def pdf(request_type):
         /pdf/email
         /pdf/download
 
-    Each with three optional query parameters:
+    Each with four optional query parameters:
         tools=flash-mob tools=flash-mob,divestment (defaulting to all)
         lang=en (defaulting to language-default from the config)
         size=a4 size=letter (defaulting to letter)
+        download=true (force "content-disposition: attachment" header)
 
     And one with a required query parameter:
         /pdf/email?address=joe@schmoe.net
@@ -335,6 +336,7 @@ def pdf(request_type):
         size = 'letter'
 
     address = request.args.get('address', '')
+    download = request.args.get('download', '')
 
     # Create a unique hash of the PDF's specifics
     unique = '{}{}{}'.format(sorted(set(modules)), lang, size)
@@ -348,9 +350,9 @@ def pdf(request_type):
 
         elif request_type == 'download':
             pdf = make_pdf(modules, lang, size, unique_hash)
-            return Response(pdf, mimetype='application/pdf', headers={
-                'Content-Disposition': 'attachment; filename="beautifulrising-{}.pdf"'.format(unique_hash[:5])
-            })
+            headers = {'Content-Disposition': 'attachment; filename="beautifulrising-{}.pdf"'
+                .format(unique_hash[:5])} if download else {}
+            return Response(pdf, mimetype='application/pdf', headers=headers)
 
     raise BadRequest
 
