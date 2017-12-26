@@ -223,6 +223,7 @@ class ContentLoader(object):
             'en': [', ', ' and '],
             'es': [', ', ' y '],
             'ar': [' \u0648 ', ' \u0648 '],
+            'pt': [',', ' e '],
         }
         content_by_slug = {c['slug']: c for c in all_content}
         for content in all_content:
@@ -260,6 +261,7 @@ class ContentLoader(object):
             'en': '(see: [%s: %s]({}))',
             'es': '(ver: [%s: %s]({}))',
             'ar': '(انظر [%s: %s]({}))',
+            'pt': '(veja: [%s: %s]({}))',
         }
         types = {
             'en': {'methodology': 'methodology', 'principle': 'principle',
@@ -268,6 +270,8 @@ class ContentLoader(object):
                 'story': 'historia', 'tactic': 'táctica', 'theory': 'teoría'},
             'ar': {'methodology': 'منهجية', 'principle': 'مبدأ',
                 'story': 'قصة', 'tactic': 'تكتيك', 'theory': 'نظرية'},
+            'pt': {'methodology': 'metodologia', 'principle': 'princípio',
+                'story': 'história', 'tactic': 'táctica', 'theory': 'teoria'},
         }
 
         def patch_links(text):
