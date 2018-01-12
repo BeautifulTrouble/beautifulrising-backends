@@ -99,9 +99,15 @@ class ContentLoader(object):
             #TODO: in production always unwatch/watch
             #TODO: handle document renaming/deletion
 
-            # Fetch all the existing content from the db
-            existing_content = {d.doc['document_id']: d.doc for d in self.db.view('_all_docs', include_docs=True)
-                                if 'document_id' in d.doc}
+            full_reload = not (self.options.ids or self.options.changes)
+
+            if not full_reload:
+                log('db: preserving existing content')
+                existing_content = {d.doc['document_id']: d.doc for d in
+                    self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc}
+            else:
+                log('db: not preserving existing content')
+                existing_content = {}
 
             # Identify published documents by their filenames and fetch new content
             published = re.compile(self.config['published-filename-regex']).search
@@ -127,6 +133,13 @@ class ContentLoader(object):
             all_content = self.post_filters(all_content)
 
             self.download_assets()
+
+            if full_reload:
+                log('db: replacing database "{}"'.format(DB_NAME))
+                del self.couch[DB_NAME]
+                self.db_get_or_create()
+                self.configure()
+
             self.db_save(all_content)
 
 
@@ -396,6 +409,8 @@ class ContentLoader(object):
         if not doc_or_docs: return
         # Handle one or many docs
         docs = [doc_or_docs] if isinstance(doc_or_docs, dict) else doc_or_docs
+
+        log('db: storing {} doc(s)'.format(len(docs)))
         # Remove couch-disallowed keys and add _id where needed
         docs = [{k:v for k,v in d.items() if k in ('_id', '_rev') or not k.startswith('_')} for d in docs]
         [d.update(_id='{type}:{slug}'.format(**d)) for d in docs if '_id' not in d]
