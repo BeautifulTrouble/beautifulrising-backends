@@ -138,7 +138,10 @@ class ContentLoader(object):
                 log('db: replacing database "{}"'.format(DB_NAME))
                 del self.couch[DB_NAME]
                 self.db_get_or_create()
+                # After deleting the database, re-configure and re-watch
                 self.configure()
+                if not (DEBUG or DEVELOP):
+                    self.watch()
 
             self.db_save(all_content)
 
@@ -475,8 +478,8 @@ class ContentLoader(object):
 
         # Save the config before creating lots of temporary language-related data within it
         c.update(type='config', slug='api')
-        self.db_save(c)
         log('load: configuration options from drive document "{}"'.format(DRIVE_CONFIG_FILE_NAME))
+        self.db_save(c)
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
         # of synonyms and plural-keys
