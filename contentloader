@@ -293,6 +293,7 @@ class ContentLoader(object):
                 link_text, module_name, _, end = *m.groups(), *m.span()
                 # TODO: ensure this gets the right language, even on a fresh load
                 content = self.find_content(module_name, all_content, thresh=90)
+                # Module exists
                 if content:
                     if link_text:
                         replacement = '[%s]({})'.format(xref_pat) % (link_text, content['slug'])
@@ -308,9 +309,12 @@ class ContentLoader(object):
                         type_name = types[language][content['type']].upper()
                         replacement = xref_fmt_strings[language].format(xref_pat) % (type_name, link_text, content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
+                # No module, but there's link text
+                elif link_text:
+                    chunks.append(re.sub(re.escape(m.group()), link_text, text[:end]))
+                # No module, so remove markdown and leading spaces
                 else:
-                    #TODO: do something clever when a x-refed module is missing?
-                    chunks.append(text[:end])
+                    chunks.append(re.sub(r'\s*' + re.escape(m.group()), '', text[:end]))
                 text = text[end:]
                 m = xref_matcher(text)
             return ''.join(chunks) + text
