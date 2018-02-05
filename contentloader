@@ -162,7 +162,7 @@ class ContentLoader(object):
         # five for key-whatever modules and call it a day. This regex handles
         # incorrect spacing around the hyphens, Arabic hyphens and more!
         key_pattern = r'(?P<module>.+?)(?:{}[][)(]*[-—–―ـ]\s+|\s+[-—–―ـ]\s+)(?P<description>.+)'
-        key_finder = re.compile(key_pattern.format(ARABIC_BOUNDARY_REGEX)).findall
+        key_finder = re.compile(key_pattern.format(ARABIC_BOUNDARY_REGEX), re.DOTALL).findall
 
         language_default = self.config['language-default']
 
