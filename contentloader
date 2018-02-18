@@ -41,7 +41,7 @@ class ContentLoader(object):
         # Parse command line arguments
         arg_parser = argparse.ArgumentParser(description="")
         arg_parser_group = arg_parser.add_mutually_exclusive_group()
-        arg_parser_group.add_argument('--id', type=str, metavar='DOCUMENT_ID', action='append', 
+        arg_parser_group.add_argument('--id', type=google_doc_id, metavar='DOCUMENT_ID', action='append',
             default=[], dest='ids', help="Fetch a single document by its globally unique id, "
             "then update associated metadata and assets. Specify multiple times to get multiple "
             "documents at once.")

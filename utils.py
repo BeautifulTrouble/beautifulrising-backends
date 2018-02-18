@@ -116,6 +116,13 @@ def parse_archieml(text):
     return {k.lower(): v for k,v in archieml.loads(text).items() if v}
 
 
+def google_doc_id(string):
+    '''
+    Attempt to return a valid google doc id from a url or plain string
+    '''
+    return re.sub('^.*([a-zA-Z0-9-_]{44}).*$', r'\1', string)
+
+
 def mimetype(filename):
     '''
     Convenience wrapper for python-magic
@@ -209,6 +216,7 @@ __all__ = [
     'only_one_process',
     'venv_run',
     'parse_archieml',
+    'google_doc_id',
     'mimetype',
     'slugify', 
     'nest_parens',
