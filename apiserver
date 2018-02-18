@@ -115,6 +115,15 @@ def notify():
                 change_number = str(int(body['id']))
                 venv_run("contentloader", "--change-id", change_number)
 
+    # Allow manual loading invocations from control panel
+    elif state == 'load':
+        body = request.get_json()
+        if body and 'document_id' in body:
+            doc_id = body['document_id']
+            log("update: {}".format(doc_id))
+            with script_directory():
+                venv_run("contentloader", "--id", doc_id)
+
     return '', 204
 
 
