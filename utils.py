@@ -193,7 +193,6 @@ def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
 
     # Exit
     if fatal:
-        print('Quitting.')
         sys.exit(int(fatal))
 
 warn = lambda *s, fatal=False, color='red', **kw: log(*s, fatal=fatal, color=color, **kw)
@@ -203,7 +202,7 @@ def die(*s):
     '''
     Perl-y
     '''
-    log(*s, fatal=True)
+    log(*s, color='red', fatal=True)
 
 
 __all__ = [

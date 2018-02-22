@@ -99,8 +99,16 @@ class ContentLoader(object):
             #TODO: in production always unwatch/watch
             #TODO: handle document renaming/deletion
 
-            full_reload = not (self.options.ids or self.options.changes)
+            # Identify published documents by their filenames and fetch new content
+            published = re.compile(self.config['published-filename-regex']).search
+            published_documents = [d for d in self.get_documents() if published(d.title) or d.id in self.options.ids]
+            if not published_documents:
+                warn('skip: no documents to load', fatal=True)
+            new_content = filter(None, map(self.extract_and_transform, published_documents))
 
+
+            # A full reload is triggered when no ids or changes are specified
+            full_reload = not (self.options.ids or self.options.changes)
             if not full_reload:
                 log('db: preserving existing content')
                 existing_content = {d.doc['document_id']: d.doc for d in
@@ -108,11 +116,6 @@ class ContentLoader(object):
             else:
                 log('db: not preserving existing content')
                 existing_content = {}
-
-            # Identify published documents by their filenames and fetch new content
-            published = re.compile(self.config['published-filename-regex']).search
-            published_documents = (d for d in self.get_documents() if published(d.title) or d.id in self.options.ids)
-            new_content = filter(None, map(self.extract_and_transform, published_documents))
 
             # Merge new content with existing, preserving revision number and translations
             for content in new_content:
