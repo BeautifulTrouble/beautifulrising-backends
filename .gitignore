@@ -9,3 +9,5 @@ log.txt
 venv
 config.py
 ghostdriver.log
+apicache
+pdfcache
