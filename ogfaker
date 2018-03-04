@@ -75,7 +75,6 @@ def get_image_size(filename, w=1170, h=400):
     '''
     try:
         path = '.' + os.path.join(config['asset-path'], filename)
-        print(path)
         with open(path, 'rb') as image:
             data = image.read(26)
             size = len(data)
