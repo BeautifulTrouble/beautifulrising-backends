@@ -86,10 +86,10 @@ def only_one_process(name=None):
         name = os.path.splitext(os.path.basename(sys._getframe(2).f_globals['__file__']))[0]
     with script_directory(), open(name + '.lock', 'w') as f:
         try:
-            fcntl.flock(f, fcntl.LOCK_EX)
+            fcntl.lockf(f, fcntl.LOCK_EX)
             yield
         finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+            fcntl.lockf(f, fcntl.LOCK_UN)
 
 
 def venv_run(path, *args, **kwargs):
