@@ -157,13 +157,15 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
-        'contributor-question': Validator({
-            'contributors':     {'type': 'list', 'schema': {'type': 'string', 'empty': False}},
-            'email':            {'type': 'string', 'required': True},
-            'question':         {'type': 'string', 'required': True, 'empty': False},
-        }),
-        'real-world-examples': Validator({
-            'oneof': [{
+        'contributor-question': Validator({'data': {'type': 'dict', 'schema': 
+            {
+                'contributors':     {'type': 'list', 'schema': {'type': 'string', 'empty': False}},
+                'email':            {'type': 'string', 'required': True},
+                'question':         {'type': 'string', 'required': True, 'empty': False},
+            }
+        }}),
+        'real-world-examples': Validator({'data': {'type': 'dict', 'anyof_schema':
+            [{
                 'document_title':   {'type': 'string', 'required': True, 'empty': False},
                 'document_link':    {'type': 'string', 'required': True, 'empty': False},
                 'title':            {'type': 'string', 'required': True},
@@ -176,12 +178,14 @@ def intake(feature):
                 'link':             {'type': 'string', 'required': True},
                 'description':      {'type': 'string', 'required': True, 'empty': False},
             }]
-        }),
-        'newsfeed-suggestion': Validator({
-            'suggestion':       {'type': 'string', 'required': True, 'empty': False},
-        }),
-        'resource-suggestion': Validator({
-            'oneof': [{
+        }}),
+        'newsfeed-suggestion': Validator({'data': {'type': 'dict', 'schema': 
+            {
+                'suggestion':   {'type': 'string', 'required': True, 'empty': False},
+            }
+        }}),
+        'resource-suggestion': Validator({'data': {'type': 'dict', 'anyof_schema': 
+            [{
                 'title':        {'type': 'string', 'required': True},
                 'link':         {'type': 'string', 'required': True, 'empty': False},
                 'description':  {'type': 'string', 'required': True},
@@ -190,7 +194,7 @@ def intake(feature):
                 'link':         {'type': 'string', 'required': True},
                 'description':  {'type': 'string', 'required': True, 'empty': False},
             }]
-        }),
+        }}),
     }
     body = request.get_json()
     validator = feature_requirements.get(feature)
@@ -199,7 +203,7 @@ def intake(feature):
     if not validator:
         return 'No such intake endpoint', 404
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
-        if validator.validate(body):
+        if validator.validate({'data': body}):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
             if DEBUG:
                 extra = [ADMIN_EMAIL]
