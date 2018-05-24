@@ -175,8 +175,11 @@ def handle_resource_suggestion(form, notification_emails):
 
 
 def handle_contributor_question(form, notification_emails):
+    email = form['email']
     question = form['question']
     contributors = form['contributors']
+    if email:
+        question = '{} —{}'.format(question, email)
 
     for contributor in contributors:
         url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
@@ -190,8 +193,6 @@ def handle_contributor_question(form, notification_emails):
         if contributor_email:
             send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
         send_mail(notification_emails, 'A Beautiful Rising user asked {}...'.format(contributor_name), question)
-
-    #TODO: More context for questions
 
 
 # When properly invoked, call an appropriate handle_* function
