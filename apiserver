@@ -158,23 +158,38 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 def intake(feature):
     feature_requirements = {
         'contributor-question': Validator({
-            'contributors':     {'type': 'list', 'schema': {'type': 'string'}},
-            'question':         {'type': 'string', 'required': True},
+            'contributors':     {'type': 'list', 'schema': {'type': 'string', 'empty': False}},
+            'email':            {'type': 'string', 'required': True},
+            'question':         {'type': 'string', 'required': True, 'empty': False},
         }),
         'real-world-examples': Validator({
-            'document_title':   {'type': 'string', 'required': True},
-            'document_link':    {'type': 'string', 'required': True},
-            'title':            {'type': 'string', 'required': True},
-            'link':             {'type': 'string', 'required': True},
-            'description':      {'type': 'string', 'required': True},
+            'oneof': [{
+                'document_title':   {'type': 'string', 'required': True, 'empty': False},
+                'document_link':    {'type': 'string', 'required': True, 'empty': False},
+                'title':            {'type': 'string', 'required': True},
+                'link':             {'type': 'string', 'required': True, 'empty': False},
+                'description':      {'type': 'string', 'required': True},
+            }, {
+                'document_title':   {'type': 'string', 'required': True, 'empty': False},
+                'document_link':    {'type': 'string', 'required': True, 'empty': False},
+                'title':            {'type': 'string', 'required': True},
+                'link':             {'type': 'string', 'required': True},
+                'description':      {'type': 'string', 'required': True, 'empty': False},
+            }]
         }),
         'newsfeed-suggestion': Validator({
-            'suggestion':       {'type': 'string', 'required': True},
+            'suggestion':       {'type': 'string', 'required': True, 'empty': False},
         }),
         'resource-suggestion': Validator({
-            'title':            {'type': 'string', 'required': True},
-            'link':             {'type': 'string', 'required': True},
-            'description':      {'type': 'string', 'required': True},
+            'oneof': [{
+                'title':        {'type': 'string', 'required': True},
+                'link':         {'type': 'string', 'required': True, 'empty': False},
+                'description':  {'type': 'string', 'required': True},
+            }, {
+                'title':        {'type': 'string', 'required': True},
+                'link':         {'type': 'string', 'required': True},
+                'description':  {'type': 'string', 'required': True, 'empty': False},
+            }]
         }),
     }
     body = request.get_json()
