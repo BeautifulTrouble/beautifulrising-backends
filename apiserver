@@ -157,14 +157,14 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 @limiter.limit(API_INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
-        'contributor-question': Validator({'data': {'type': 'dict', 'schema': 
+        'contributor-question': Validator({'body': {'type': 'dict', 'schema':
             {
                 'contributors':     {'type': 'list', 'schema': {'type': 'string', 'empty': False}},
                 'email':            {'type': 'string', 'required': True},
                 'question':         {'type': 'string', 'required': True, 'empty': False},
             }
         }}),
-        'real-world-examples': Validator({'data': {'type': 'dict', 'anyof_schema':
+        'real-world-examples': Validator({'body': {'type': 'dict', 'anyof_schema':
             [{
                 'document_title':   {'type': 'string', 'required': True, 'empty': False},
                 'document_link':    {'type': 'string', 'required': True, 'empty': False},
@@ -179,12 +179,12 @@ def intake(feature):
                 'description':      {'type': 'string', 'required': True, 'empty': False},
             }]
         }}),
-        'newsfeed-suggestion': Validator({'data': {'type': 'dict', 'schema': 
+        'newsfeed-suggestion': Validator({'body': {'type': 'dict', 'schema':
             {
                 'suggestion':   {'type': 'string', 'required': True, 'empty': False},
             }
         }}),
-        'resource-suggestion': Validator({'data': {'type': 'dict', 'anyof_schema': 
+        'resource-suggestion': Validator({'body': {'type': 'dict', 'anyof_schema':
             [{
                 'title':        {'type': 'string', 'required': True},
                 'link':         {'type': 'string', 'required': True, 'empty': False},
@@ -203,7 +203,7 @@ def intake(feature):
     if not validator:
         return 'No such intake endpoint', 404
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
-        if validator.validate({'data': body}):
+        if validator.validate({'body': body}):
             extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
             if DEBUG:
                 extra = [ADMIN_EMAIL]
