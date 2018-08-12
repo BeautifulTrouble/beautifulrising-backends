@@ -16,9 +16,6 @@ from copy import deepcopy
 from datetime import datetime
 from dateutil import parser
 from hashlib import md5
-from itertools import zip_longest
-from pprint import pprint
-from string import capwords
 from subprocess import Popen
 from urllib.parse import urljoin
 
@@ -827,7 +824,7 @@ class ContentLoader(object):
                     if file.save_as(file.title):
                         log('download: asset "{}"'.format(file.title))
                         convert = True
-                    if convert and file.attributes['mimeType'] in ('image/png', 'image/jpeg'):
+                    if convert and file.attributes['mimeType'] in ('image/gif', 'image/png', 'image/jpeg'):
                         log('convert: asset "{}"'.format(file.title))
                         for prefix,args in self.config['asset-manipulation'].items():
                             Popen(['convert', *shlex.split(args),
