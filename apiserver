@@ -243,7 +243,7 @@ def filter_output(resources, limit_related_hack=0):
         'lang', 'type', 'title', 'slug', 'timestamp',
         'document_id', 'document_link', 'document_title',
         # Added during custom filtering
-        'byline'
+        'byline', 'email-available',
     }
 
     # Get one valid language no matter what
