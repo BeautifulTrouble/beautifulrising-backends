@@ -224,7 +224,7 @@ module_types = [t['one'] for t in config['types-modules']]
 punctuation_table = str.maketrans('', '', string.punctuation + '¿¡‘’“”')
 cleaned_string = lambda i: str(i or '').translate(punctuation_table)
 
-def filter_output(resources, limit_related_hack=0):
+def filter_output(resources):
     '''
     Filter the output by language, merge x-language keys, and hide keys
     '''
@@ -336,24 +336,6 @@ def filter_output(resources, limit_related_hack=0):
 
         output.append(resource)
 
-    # Related module HACK (this needs to be in the front end!)
-    if limit_related_hack:
-        log('hack: randomizing & limiting related modules (Please move to front-end!)')
-        snapshots = {i['slug'] for i in output if i.get('module-type-effective') == 'snapshot'}
-        non_snapshots = {i['slug'] for i in output if i.get('module-type-effective') in ('gallery', 'full')}
-        for resource in output:
-            for field in ('principles', 'stories', 'tactics', 'theories', 'methodologies'):
-                if field in resource:
-                    related = set(resource[field])
-                    new_related = list(related & non_snapshots)
-
-                    if len(new_related) < limit_related_hack:
-                        snaps = related & snapshots
-                        new_related += random.sample(snaps, min(len(snaps), limit_related_hack - len(new_related)))
-
-                    random.shuffle(new_related)
-                    resource[field] = new_related[:limit_related_hack]
-
     # Return an dict or list of dicts as appropriate
     if single:
         output = output or [{}]
@@ -438,7 +420,7 @@ class All(Resource):
     query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
         try:
-            return filter_output([doc['value'] for doc in db.query(self.query)], limit_related_hack=5)
+            return filter_output([doc['value'] for doc in db.query(self.query)])
         except (KeyError, ResourceNotFound): raise NotFound
 api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
 
