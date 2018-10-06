@@ -151,7 +151,7 @@ def handle_real_world_examples(form, notification_emails):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new real world example has been contributed',
-        'Have a look: ' + output_link)
+        'Real World Example suggestions are here:\n{}'.format(output_link))
 
 
 def handle_newsfeed_suggestion(form, notification_emails):
@@ -161,7 +161,7 @@ def handle_newsfeed_suggestion(form, notification_emails):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new newsfeed suggestion has been contributed',
-        'The suggestion was "{}". Have a look at all suggestions: {}'.format(form.get('suggestion'), output_link))
+        'The suggestion is: {}\n\nAll newsfeed suggestions are here:\n{}'.format(form.get('suggestion'), output_link))
 
 
 def handle_resource_suggestion(form, notification_emails):
@@ -171,7 +171,7 @@ def handle_resource_suggestion(form, notification_emails):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(notification_emails, 'A new resource suggestion has been contributed',
-        'The resource was "{}". Have a look at all suggestions: {}'.format(form.get('title'), output_link))
+        'The suggestion is: {}\n\nAll resource suggestions are here:\n{}'.format(form.get('title'), output_link))
 
 
 def handle_contributor_question(form, notification_emails):
@@ -179,7 +179,7 @@ def handle_contributor_question(form, notification_emails):
     question = form['question']
     contributors = form['contributors']
     if email:
-        question = '{} —{}'.format(question, email)
+        question = '{} asked:\n\n{}'.format(email, question)
 
     for contributor in contributors:
         url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
