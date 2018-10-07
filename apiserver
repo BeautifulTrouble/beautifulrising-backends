@@ -291,7 +291,6 @@ def filter_output(resources):
         if 'type' in resource and resource['type'] in private_keys:
             for key in private_keys[resource['type']]:
                 resource.pop(key, None)
-        resource.pop('private', None)
 
         # Remove internal keys
         internal = [k for k in resource if k.startswith('_')]
