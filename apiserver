@@ -31,6 +31,7 @@ from werkzeug.exceptions import NotFound, Forbidden
 from utils import *
 from config import *
 
+INTAKE_LIMIT = '10/minute'
 
 # App Setup
 # ////////////////////////////////////////////////////////////////////////////
@@ -154,7 +155,7 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 
 
 @app.route('/intake/<feature>', methods=['POST'])
-@limiter.limit(API_BASE_LIMIT)
+@limiter.limit(INTAKE_LIMIT)
 def intake(feature):
     feature_requirements = {
         'contributor-question': Validator({'body': {'type': 'dict', 'schema':

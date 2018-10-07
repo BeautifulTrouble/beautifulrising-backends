@@ -32,19 +32,20 @@ from utils import (
     warn,
 )
 from config import (
-    API_BASE_LIMIT,
     API_PATH,
     API_SERVER, 
     MAILGUN_API_KEY, 
-    PDF_CACHE_LIFESPAN,
-    PDF_API_CACHE_LIFESPAN,
 )
 
-RELATIVE_URL_REGEX = re.compile('^/tool/.+')
 ABSOLUTE_URL_PREFIX = 'https://beautifulrising.org'
+RELATIVE_URL_REGEX = re.compile('^/tool/.+')
 TAG_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tag/%s')
 TOOL_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tool/%s')
 TYPE_ORDER = 'story', 'tactic', 'principle', 'theory', 'methodology'
+
+PDF_CACHE_LIFESPAN = 1440 * 60
+PDF_API_CACHE_LIFESPAN = 60 * 60
+PDF_LIMIT = '5/minute'
 
 
 app = Flask(__name__)
@@ -300,7 +301,7 @@ def send_mail(to, from_, subject, message, filename, pdf):
 
 
 @app.route('/pdf/<request_type>', methods=['GET'])
-@limiter.limit(API_BASE_LIMIT)
+@limiter.limit(PDF_LIMIT)
 def pdf(request_type):
     '''
     This route provides two main endpoints:
