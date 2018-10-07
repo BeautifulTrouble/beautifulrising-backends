@@ -154,7 +154,7 @@ def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
 
 
 @app.route('/intake/<feature>', methods=['POST'])
-@limiter.limit(API_INTAKE_LIMIT)
+@limiter.limit(API_BASE_LIMIT)
 def intake(feature):
     feature_requirements = {
         'contributor-question': Validator({'body': {'type': 'dict', 'schema':

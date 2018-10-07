@@ -32,7 +32,7 @@ from utils import (
     warn,
 )
 from config import (
-    API_INTAKE_LIMIT, 
+    API_BASE_LIMIT,
     API_PATH,
     API_SERVER, 
     MAILGUN_API_KEY, 
@@ -300,7 +300,7 @@ def send_mail(to, from_, subject, message, filename, pdf):
 
 
 @app.route('/pdf/<request_type>', methods=['GET'])
-@limiter.limit(API_INTAKE_LIMIT)
+@limiter.limit(API_BASE_LIMIT)
 def pdf(request_type):
     '''
     This route provides two main endpoints:
