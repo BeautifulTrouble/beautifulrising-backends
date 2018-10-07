@@ -13,8 +13,6 @@ import time
 
 import requests
 from flask import Flask
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from jinja2 import Template
 from plucky import plucks
 
@@ -24,10 +22,6 @@ from utils import (
     script_directory,
 )
 from config import (
-    API_CACHE_FILE,
-    API_CACHE_LIFESPAN,
-    # TODO: Use more granular limits per task
-    API_GENERAL_LIMIT,
     API_SERVER,
     API_PATH,
     FB_APP_ID,
@@ -38,6 +32,8 @@ from config import (
 PREFIX = '/opengraph/'
 ALL_PATH = '{}{}/all'.format(API_SERVER, API_PATH)
 CONFIG_PATH = '{}{}/config'.format(API_SERVER, API_PATH)
+API_CACHE_FILE = 'apicache'
+API_CACHE_LIFESPAN = 60 * 5
 
 
 template = '''
@@ -65,7 +61,6 @@ template = '''
 
 
 app = Flask(__name__)
-limiter = Limiter(app, key_func=get_remote_address)
 
 
 def get_image_size(filename, w=1170, h=400):
@@ -163,7 +158,6 @@ def fake_any(lang='', path=''):
 
 @app.route(PREFIX + 'tool/<slug>', methods=['GET'])
 @app.route(PREFIX + '<string(length=2):lang>/tool/<slug>', methods=['GET'])
-@limiter.limit(API_GENERAL_LIMIT)
 def fake_tool(lang='', slug=''):
     content = get_cache(lang)
     tool = by_slug(content, slug)
