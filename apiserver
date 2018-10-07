@@ -205,11 +205,7 @@ def intake(feature):
         return 'No such intake endpoint', 404
     if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
         if validator.validate({'body': body}):
-            extra = config.get('private', {}).get('notification-emails', [ADMIN_EMAIL])
-            if DEBUG:
-                extra = [ADMIN_EMAIL]
-            args = map(json.dumps, (body, extra))
-            venv_run('intakehandler', feature, *args)
+            venv_run('intakehandler', feature, json.dumps(body))
             return '', 204
     schema = pprint.pformat(dict(validator.schema))
     return 'Validation Failed. Use reCAPTCHA and the following schema:\n{}'.format(schema), 400

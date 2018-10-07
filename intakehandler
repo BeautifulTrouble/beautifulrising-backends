@@ -14,12 +14,18 @@ try:
     import requests
 
     from utils import *
-    from config import *
     from config import (
+        API_ADMIN_TOKEN,
+        API_NOTIFICATION_EMAIL,
+        API_SERVER,
+        API_PATH,
+        DRIVE_CLIENT_NAME,
         DRIVE_ROOT_FOLDER_NAME,
+        DRIVE_SERVICE_ACCOUNT_JSON_FILENAME,
+        MAILGUN_API_KEY,
     )
 
-    assert len(sys.argv) >= 2
+    assert len(sys.argv) == 3
     assert not set(sys.argv) & {'-h', '--help'}
 except (ImportError, AssertionError):
     sys.exit('This tool is meant to be invoked by the API server')
@@ -144,37 +150,37 @@ def fruit_salad(string):
 
 # Intake Handlers
 # ////////////////////////////////////////////////////////////////////////////
-def handle_real_world_examples(form, notification_emails):
+def handle_real_world_examples(form):
     doc_name = 'Contributed Real World Examples'
     doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
-    send_mail(notification_emails, 'A new real world example has been contributed',
+    send_mail(API_NOTIFICATION_EMAIL, 'A new real world example has been contributed',
         'Real World Example suggestions are here:\n{}'.format(output_link))
 
 
-def handle_newsfeed_suggestion(form, notification_emails):
+def handle_newsfeed_suggestion(form):
     doc_name = 'Contributed Newsfeed Suggestions'
     doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
-    send_mail(notification_emails, 'A new newsfeed suggestion has been contributed',
+    send_mail(API_NOTIFICATION_EMAIL, 'A new newsfeed suggestion has been contributed',
         'The suggestion is: {}\n\nAll newsfeed suggestions are here:\n{}'.format(form.get('suggestion'), output_link))
 
 
-def handle_resource_suggestion(form, notification_emails):
+def handle_resource_suggestion(form):
     doc_name = 'Contributed Resource Suggestions'
     doc = add_to_doc(doc_name, form)
 
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
-    send_mail(notification_emails, 'A new resource suggestion has been contributed',
+    send_mail(API_NOTIFICATION_EMAIL, 'A new resource suggestion has been contributed',
         'The suggestion is: {}\n\nAll resource suggestions are here:\n{}'.format(form.get('title'), output_link))
 
 
-def handle_contributor_question(form, notification_emails):
+def handle_contributor_question(form):
     email = form['email']
     question = form['question']
     contributors = form['contributors']
@@ -188,11 +194,11 @@ def handle_contributor_question(form, notification_emails):
             contributor_email = j.get('email', '')
             contributor_name = j.get('title', contributor)
         except requests.RequestException:
-            send_mail(notification_emails,
+            send_mail(API_NOTIFICATION_EMAIL,
                 "Failed to send question to Beautiful Rising contributor {}".format(contributor), question)
         if contributor_email:
             send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
-        send_mail(notification_emails, 'A Beautiful Rising user asked {}...'.format(contributor_name), question)
+        send_mail(API_NOTIFICATION_EMAIL, 'A Beautiful Rising user asked {}...'.format(contributor_name), question)
 
 
 # When properly invoked, call an appropriate handle_* function
@@ -201,5 +207,8 @@ if __name__ == '__main__':
     with only_one_process('intake'):
         handler = globals().get('handle_%s' % sys.argv[1].replace('-','_'))
         if handler and callable(handler):
-            handler(*(json.loads(a) for a in sys.argv[2:]))
+            log("intake: Handing {}".format(sys.argv[1]))
+            handler(json.loads(sys.argv[2]))
+        else:
+            warn("intake: Not handing {}".format(sys.argv[1]))
 
