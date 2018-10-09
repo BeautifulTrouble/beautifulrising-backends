@@ -21,3 +21,4 @@ unidecode
 validators
 cerberus
 pyicu
+oauth2client
