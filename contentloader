@@ -103,7 +103,6 @@ class ContentLoader(object):
                 warn('skip: no documents to load', fatal=True)
             new_content = filter(None, map(self.extract_and_transform, published_documents))
 
-
             # A full reload is triggered when no ids or changes are specified
             full_reload = not (self.options.ids or self.options.changes)
             if not full_reload:
@@ -209,11 +208,13 @@ class ContentLoader(object):
 
                 # Clean up some modules with example tags
                 tags = content.get('tags')
-                if tags and len(tags) == 3 and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
-                    del content['tags']
+                if tags:
+                    if len(tags) == 3 and all(t.lower() in ['corruption', 'mining', 'gender & sexuality'] for t in tags):
+                        del content['tags']
+                    # Slugify tags (note that they're not checked for existence)
+                    content['tags'] = [slugify(t) for t in tags]
 
-                # Simplify the key-stuff
-                # TODO: Slugify these 
+                # Simplify the key-stuff (more processing is done in post_filters)
                 content['key-modules'] = {}
                 for module_type in module_types_plural:
                     key_name = 'key-' + module_type
