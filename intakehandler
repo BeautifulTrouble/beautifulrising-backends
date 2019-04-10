@@ -198,7 +198,7 @@ def handle_contributor_question(form):
                 "Failed to send question to Beautiful Rising contributor {}".format(contributor), question)
         if contributor_email:
             send_mail(contributor_email, 'A Beautiful Rising user asked...', question)
-    send_mail(API_NOTIFICATION_EMAIL, 'A Beautiful Rising user contacted a contributor...', question)
+        send_mail(API_NOTIFICATION_EMAIL, 'A Beautiful Rising user contacted {}...'.format(contributor_name), question)
 
 
 # When properly invoked, call an appropriate handle_* function
