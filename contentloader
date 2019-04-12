@@ -172,7 +172,7 @@ class ContentLoader(object):
             if NEW in content:
                 # Flag person docs as having an email address
                 if content['type'] == 'person':
-                    content['email-available'] = 'email' in content
+                    content['email-available'] = bool(content.get('emails'))
 
                 # Add a module-type
                 if content['type'] in module_types:
