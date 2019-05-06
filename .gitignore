@@ -3,7 +3,6 @@
 *.swp
 *.json
 *.lock
-.python-version
 __pycache__
 log.txt
 venv
