@@ -824,6 +824,7 @@ class ContentLoader(object):
         all_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc]
         for content in all_content:
             self.generate_preview(content)
+        self.db_save(all_content)
 
 
     def generate_preview(self, content):
