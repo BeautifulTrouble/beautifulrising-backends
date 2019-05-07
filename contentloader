@@ -48,6 +48,8 @@ class ContentLoader(object):
             "documents at once.")
         arg_parser_group.add_argument('--assets', action='store_true', help="Download and convert "
             "all assets. Use after changing asset settings in the config.")
+        arg_parser_group.add_argument('--regenerate-previews', action='store_true', help="Update "
+            "external site preview images.")
         arg_parser_group.add_argument('--watch-docs', action='store_true',
             help="Initiate a request to watch drive for changes. It will expire in one day.")
         arg_parser_group.add_argument('--stop-watching', action='store_true', 
@@ -74,6 +76,9 @@ class ContentLoader(object):
         # Download assets
         if self.options.assets:
             self.download_assets(force_conversion=True)
+
+        elif self.options.regenerate_previews:
+            self.regenerate_previews()
 
         # Watch for changes
         elif self.options.watch_docs:
@@ -151,12 +156,6 @@ class ContentLoader(object):
         '''
         log('filters: preprocessing unmerged docs')
 
-        # TODO: There are better ways to make a relative path
-        asset_path_rel = self.config['asset-path'].lstrip('/')
-
-        rwe_file_pattern = 'rwe_{md5}_{slug:.32}.jpg'
-        rwe_is_generated = re.compile('rwe_[a-f0-9]{32}_').match
-
         # There are about 12 more dashes in unicode, but we'll support these
         # five for key-whatever modules and call it a day. This regex handles
         # incorrect spacing around the hyphens, Arabic hyphens and more!
@@ -191,13 +190,7 @@ class ContentLoader(object):
                 # Clean up real-world-examples section
                 content['real-world-examples'] = [e for e in content.get('real-world-examples', [])
                                                   if all(map(e.get, ['title','link','description']))]
-                for e in content['real-world-examples']:
-                    if 'image' not in e or rwe_is_generated(e['image']):
-                        filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
-                        output_path = os.path.join(asset_path_rel, filename)
-                        e['image'] = filename
-                        log('siteprev: generating for "{}"'.format(e['title']))
-                        venv_run('sitepreview', e['link'], output_path)
+                self.generate_preview(content)
                 if not content['real-world-examples']:
                     del content['real-world-examples']
 
@@ -821,6 +814,35 @@ class ContentLoader(object):
                             # Ignore leading hyphens when sorting
                             doc[field_back] = sorted({slug} | set(backward_field), key=lambda s: s.lstrip('-'))
         return all_content
+
+
+    def regenerate_previews(self):
+        '''
+        Generate previews on existing db
+        '''
+        self.db_get_or_create()
+        all_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc]
+        for content in all_content:
+            self.generate_preview(content)
+
+
+    def generate_preview(self, content):
+        '''
+        Run sitepreview on each RWE of a given content item
+        '''
+        # TODO: There are better ways to make a relative path
+        asset_path_rel = self.config['asset-path'].lstrip('/')
+
+        rwe_file_pattern = 'rwe_{md5}_{slug:.32}.jpg'
+        rwe_is_generated = re.compile('rwe_[a-f0-9]{32}_').match
+
+        for e in content.get('real-world-examples', []):
+            if 'image' not in e or rwe_is_generated(e['image']):
+                filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
+                output_path = os.path.join(asset_path_rel, filename)
+                e['image'] = filename
+                log('siteprev: generating for "{}"'.format(e['title']))
+                venv_run('sitepreview', e['link'], output_path)
 
 
     def download_assets(self, force_conversion=False):
