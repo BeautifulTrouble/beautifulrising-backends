@@ -57,7 +57,7 @@ def download_og_image(url, output_path):
     except requests.RequestException:
         return
 
-    for element in BeautifulSoup(html, 'html.parser').select('meta[property=og:image]'):
+    for element in BeautifulSoup(html, 'html.parser').select('meta[property="og:image"]'):
         ogimageurl = element.get('content')
         if ogimageurl:
             try:
