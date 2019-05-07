@@ -24,7 +24,7 @@ import driveclient
 import jinja2
 import langdetect
 import requests
-from fuzzywuzzy.process import extractOne as fuzzy
+from fuzzywuzzy.process import extractOne
 
 from utils import *
 from config import *
@@ -381,12 +381,12 @@ class ContentLoader(object):
         '''
         General-purpose fuzzy matcher
         '''
-        match = fuzzy(title, title_list)
+        match = extractOne(title, title_list)
         if match and match[1] >= thresh:
             return match[0]
 
 
-    def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}):
+    def find_content(self, item_name, item_list, thresh=50, fuzzy_match_cache={}, rename_cache=set()):
         '''
         Use fuzzy matching to find a content item from a list
         This should always return a dict
@@ -396,10 +396,22 @@ class ContentLoader(object):
         '''
         if not isinstance(item_name, str):
             return {}
+
         cached = fuzzy_match_cache.setdefault(id(item_list), {}).get(item_name)
         if cached:
             return cached
-        match = fuzzy(item_name, item_list, processor=lambda m: m.get('title', ''))
+
+        # First determine whether the item_name refers to a module which has been renamed
+        renamed = self.config['renamed-modules']
+        match, confidence = extractOne(item_name, renamed.keys())
+        if confidence > 90:
+            if item_name not in rename_cache:
+                rename_cache.add(item_name)
+                log("renamed: reference changed from '{}' to '{}'".format(item_name, renamed[match]))
+            item_name = renamed[match]
+
+        # Perform the actual match
+        match = extractOne(item_name, item_list, processor=lambda m: m.get('title', ''))
         if match and match[1] >= thresh:
             fuzzy_match_cache[id(item_list)][item_name] = match[0]
             return match[0]
@@ -484,6 +496,8 @@ class ContentLoader(object):
                 c['relationships']['forward'].update(value)
             if key.startswith('two-way'):
                 c['relationships']['backward'].append(value)
+        # Document renaming
+        c['renamed-modules'] = {d['old']: d['new'] for d in c.get('renamed-modules', [])}
 
         # Save the config before creating lots of temporary language-related data within it
         c.update(type='config', slug='api')
