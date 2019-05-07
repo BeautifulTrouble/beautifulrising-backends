@@ -1,8 +1,8 @@
 [Unit]
-Description=contentloader
+Description=Request push notifications about Google Drive content changes for contentloader
 
 [Service]
 Type=oneshot
-ExecStart=/path/to/venv/bin/python /path/to/contentloader --watch
+ExecStart=/path/to/venv/bin/python /path/to/contentloader --watch-docs
 StandardOutput=syslog
 StandardError=syslog

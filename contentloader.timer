@@ -1,5 +1,5 @@
 [Unit]
-Description=Run "contentloader --watch" twice daily
+Description=Run "contentloader --watch-docs" twice daily
 
 [Timer]
 OnCalendar=*-*-* 00,12:00:00
