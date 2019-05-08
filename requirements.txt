@@ -23,3 +23,4 @@ cerberus
 pyicu
 oauth2client
 google-api-python-client==1.7.4
+pyppeteer

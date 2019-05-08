@@ -4,18 +4,16 @@ import autovenv
 autovenv.run()
 
 
+import asyncio
 import json
 import os
 import subprocess
 import sys
-from http.client import HTTPException
 
 import magic
-import psutil
+import pyppeteer
 import requests
-import validators
 from bs4 import BeautifulSoup
-from selenium import webdriver
 
 
 from utils import (
@@ -29,21 +27,8 @@ CAN_OVERWRITE = [
     'image/png',
     'image/jpeg',
     'image/gif',
+    'text/html',    # Sometimes you get a page instead of an image
 ]
-
-
-def phantom_execute(script, args=None):
-    '''
-    This function runs a javascript snippet within the PhantomJS environment
-    It relies on this line found in phantom_init:
-
-        phantom.command_executor._commands['execute'] = (
-            'POST', '/session/$sessionId/phantom/execute')
-    '''
-
-    if args is None:
-        args = []
-    phantom.execute('execute', {'script': script, 'args': args})
 
 
 def download_og_image(url, output_path):
@@ -61,48 +46,54 @@ def download_og_image(url, output_path):
         ogimageurl = element.get('content')
         if ogimageurl:
             try:
+                log(f'preview: og:image {output_path}')
                 r = requests.get(ogimageurl)
             except requests.RequestException:
                 return
             if r.status_code == 200:
                 with open(output_path, 'wb') as f:
                     f.write(r.content)
+                    subprocess.run(['convert', '-resize', 'x512', output_path, output_path])
                     return True
 
 
+async def main(urls_and_outputs):
+    log('pyppeteer: starting up...')
+    browser = await pyppeteer.launch()
+
+    for url, output_path in urls_and_outputs.items():
+        if os.path.isfile(output_path):
+            if magic.from_file(output_path, mime=True) not in CAN_OVERWRITE:
+                warn(f'preview: not overwriting {output_path}')
+                continue
+
+        if not download_og_image(url, output_path):
+            try:
+                page = await browser.newPage()
+                await page.setViewport({'width': 1366, 'height': 768, 'deviceScaleFactor': 0.5})
+                log(f'preview: rendering {output_path}')
+                await page.goto(url, {'timeout': 15000})
+                await page.screenshot({'path': output_path})
+                await page.close()
+                #subprocess.run(['convert', '-resize', '50%', output_path, output_path])
+            except (pyppeteer.errors.PyppeteerError, pyppeteer.errors.TimeoutError) as e:
+                warn(f'pyppeteer: {e} ({url})')
+            except ConnectionError:
+                await browser.close()
+                browser = await pyppeteer.launch()
+
+    log('preview: finished')
+    await browser.close()
+
+
 if __name__ == '__main__':
-    if len(sys.argv) != 3 or not validators.url(sys.argv[1]):
-        die('preview: Usage: {} SITE_URL OUTPUT_FILENAME'.format(os.path.basename(sys.argv[0])))
+    if len(sys.argv) != 2:
+        die(f'preview: Usage: {os.path.basename(sys.argv[0])} JSON_MAPPING_OF_URLS:OUTPUTS')
+    try:
+        urls_and_outputs = json.loads(sys.argv[1])
+    except json.decoder.JSONDecodeError:
+        die('preview: unable to load json mapping of urls to output files')
 
-    url, output_path = sys.argv[1:]
-
-    if os.path.isfile(output_path):
-        if magic.from_file(output_path, mime=True) not in CAN_OVERWRITE:
-            die('preview: refusing to overwrite "{}"!'.format(output_path))
-
-    if not download_og_image(url, output_path):
-        log('phantomjs: starting up...')
-
-        try:
-            phantom = webdriver.PhantomJS()
-            phantom.command_executor._commands['execute'] = ('POST', '/session/$sessionId/phantom/execute')
-            phantom.get(url)
-            phantom_execute('''
-                // Prevent transparent pages
-                this.evaluate(function() {{ document.body.bgColor = 'white'; }});
-                this.viewportSize = {{width: {w}, height: {h}}};
-                this.clipRect = {{top: 0, left: 0, width: {w}, height: {h}}};
-                this.render({json_output_path});
-                phantom.exit();
-            '''.format(w=1366, h=768, json_url=json.dumps(url), json_output_path=json.dumps(output_path)))
-        except HTTPException:
-            log('phantomjs: failed to fetch "{}"'.format(url))
-        else:
-            log('preview: converting preview image {}'.format(output_path))
-            subprocess.run(['convert', '-resize', '50%', output_path, output_path])
-
-        for c in psutil.Process().children():
-            if c.name() == 'phantomjs':
-                c.terminate()
-
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main(urls_and_outputs))
 

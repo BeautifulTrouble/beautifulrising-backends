@@ -6,6 +6,7 @@ import autovenv
 autovenv.run()
 
 import argparse
+import json
 import math
 import os
 import re
@@ -73,10 +74,14 @@ class ContentLoader(object):
         # Load DRIVE_CONFIG_FILE_NAME from DRIVE_ROOT_FOLDER_NAME and store as "config:api" & self.config
         self.configure()
 
+        # Site previews to be generated last
+        self.preview_queue = {}
+
         # Download assets
         if self.options.assets:
             self.download_assets(force_conversion=True)
 
+        # Generate fresh site previews
         elif self.options.regenerate_previews:
             self.regenerate_previews()
 
@@ -137,6 +142,7 @@ class ContentLoader(object):
             all_content = self.post_filters(all_content)
 
             self.download_assets()
+            self.generate_previews()
 
             if full_reload:
                 log('db: replacing database "{}"'.format(DB_NAME))
@@ -190,7 +196,7 @@ class ContentLoader(object):
                 # Clean up real-world-examples section
                 content['real-world-examples'] = [e for e in content.get('real-world-examples', [])
                                                   if all(map(e.get, ['title','link','description']))]
-                self.generate_preview(content)
+                self.enqueue_previews_and_update_rwes(content)
                 if not content['real-world-examples']:
                     del content['real-world-examples']
 
@@ -816,6 +822,14 @@ class ContentLoader(object):
         return all_content
 
 
+    def generate_previews(self):
+        '''
+        Launch external preview generation tool
+        '''
+        log(f'siteprev: generating for {len(self.preview_queue)} url(s)')
+        venv_run('sitepreview', json.dumps(self.preview_queue))
+
+
     def regenerate_previews(self):
         '''
         Generate previews on existing db
@@ -823,27 +837,25 @@ class ContentLoader(object):
         self.db_get_or_create()
         all_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc]
         for content in all_content:
-            self.generate_preview(content)
+            self.enqueue_previews_and_update_rwes(content)
+        self.generate_previews()
         self.db_save(all_content)
 
 
-    def generate_preview(self, content):
+    def enqueue_previews_and_update_rwes(self, content):
         '''
-        Run sitepreview on each RWE of a given content item
+        Gather RWE urls and update RWEs in-place
         '''
         # TODO: There are better ways to make a relative path
         asset_path_rel = self.config['asset-path'].lstrip('/')
 
-        rwe_file_pattern = 'rwe_{md5}_{slug:.32}.jpg'
-        rwe_is_generated = re.compile('rwe_[a-f0-9]{32}_').match
-
         for e in content.get('real-world-examples', []):
-            if 'image' not in e or rwe_is_generated(e['image']):
-                filename = rwe_file_pattern.format(md5=md5(e['link'].encode()).hexdigest(), slug=slugify(e['title']))
-                output_path = os.path.join(asset_path_rel, filename)
-                e['image'] = filename
-                log('siteprev: generating for "{}"'.format(e['title']))
-                venv_run('sitepreview', e['link'], output_path)
+            if 'image' not in e or re.match('rwe_[a-f0-9]{32}_', e['image']):
+                hash = md5(e['link'].encode()).hexdigest()
+                slug = slugify(e['title'])
+                # Note: updating the RWE in-place requires saving to db
+                e['image'] = filename = f'rwe_{hash}_{slug}.jpg'
+                self.preview_queue[e['link']] = os.path.join(asset_path_rel, filename)
 
 
     def download_assets(self, force_conversion=False):
