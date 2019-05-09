@@ -126,7 +126,7 @@ class ContentLoader(object):
                 published = re.compile(self.config['published-filename-regex']).search
                 published_documents = [d for d in self.get_documents() if published(d.title) or d.id in self.options.ids]
 
-                if self.options.save_local or True:
+                if self.options.save_local:
                     with script_directory():
                         with open(DRIVE_CACHE_FILE_NAME, 'w') as f:
                             json.dump(published_documents, f, default=driveclient_document_json_encoder)
