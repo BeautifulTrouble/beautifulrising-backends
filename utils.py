@@ -86,7 +86,7 @@ def script_subdirectory(name):
     subdirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)), name)
     if not os.path.exists(subdirectory):
         os.makedirs(subdirectory)
-        log('mkdir: {}'.format(subdirectory))
+        log(f'mkdir: {subdirectory}')
     os.chdir(subdirectory)
     try: 
         yield subdirectory
@@ -153,7 +153,7 @@ def slugify(s, allow=''):
     Reproduce these steps for consistent slugs!
     '''
     s = unidecode.unidecode(s).lower().replace("'", '')
-    return re.sub(r'[^\w{}]+'.format(allow), '-', s)
+    return re.sub(rf'[^\w{allow}]+', '-', s)
 
 
 def nest_parens(text, level=0):
@@ -193,7 +193,7 @@ def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
     color = colors[str(color).lower()]
 
     # Select color or plain logging depending on terminal type
-    logfmt = ('\x1b[30m[\x1b[{}m{{:^10}}\x1b[30m]\x1b[0m'.format(color) if tty else '[{:^10}]').format
+    logfmt = (f'\x1b[30m[\x1b[{color}m{{:^10}}\x1b[30m]\x1b[0m' if tty else '[{:^10}]').format
 
     # Format and colorize special messages (those with a colon after the first word)
     if ':' in s[0]:
@@ -204,7 +204,7 @@ def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
     # Log to file
     script_dir = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(script_dir, 'log.txt'), 'a', encoding="utf-8") as file:
-        file.write('{} {}\n'.format(datetime.datetime.utcnow().isoformat(), s))
+        file.write(f'{datetime.datetime.utcnow().isoformat()} {s}\n')
 
     # Log to terminal
     print(s, **kw)

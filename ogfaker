@@ -30,8 +30,8 @@ from config import (
 
 # Web server should rewrite urls from certain UA's with this prefix
 PREFIX = '/opengraph/'
-ALL_PATH = '{}{}/all'.format(API_SERVER, API_PATH)
-CONFIG_PATH = '{}{}/config'.format(API_SERVER, API_PATH)
+ALL_PATH = f'{API_SERVER}{API_PATH}/all'
+CONFIG_PATH = f'{API_SERVER}{API_PATH}/config'
 API_CACHE_FILE = 'apicache'
 API_CACHE_LIFESPAN = 60 * 5
 
@@ -108,11 +108,11 @@ def cache_content():
     while True:
         data = {}
         for language in config.get('language-all', ['en']):
-            data[language] = requests.get('{}?lang={}'.format(ALL_PATH, language)).json()
+            data[language] = requests.get(f'{ALL_PATH}?lang={language}').json()
         with script_directory():
             with open(API_CACHE_FILE, 'w') as f:
                 json.dump(data, f)
-        log('apicache: sleeping for {} seconds'.format(API_CACHE_LIFESPAN))
+        log(f'apicache: sleeping for {API_CACHE_LIFESPAN} seconds')
         time.sleep(API_CACHE_LIFESPAN)
 
 
@@ -148,7 +148,7 @@ def fake_any(lang='', path=''):
     image_w, image_h = get_image_size(image)
 
     if lang and path:
-        path = '{}/{}'.format(lang, path)
+        path = f'{lang}/{path}'
     elif lang:
         path = lang
 
@@ -168,11 +168,11 @@ def fake_tool(lang='', slug=''):
     tagline = tool.get('snapshot', tagline)
     title = tool.get('title', site_title)
     if title != site_title:
-        title = '{}: {}'.format(site_title, title)
+        title = f'{site_title}: {title}'
 
-    path = 'tool/{}'.format(slug)
+    path = f'tool/{slug}'
     if lang:
-        path = '{}/tool/{}'.format(lang, slug)
+        path = f'{lang}/tool/{slug}'
 
     return template.format(title=title, site_title=site_title, tagline=tagline,
         image=image, image_w=image_w, image_h=image_h, path=path)

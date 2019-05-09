@@ -58,7 +58,7 @@ class ContentLoader(object):
         exclusive_args.add_argument('--save-local', action='store_true',
             help="Save local cache of data for use with --local and quit.")
         exclusive_args.add_argument('--delete-db', action='store_true',
-            help='Delete any existing database named "{}".'.format(DB_NAME))
+            help=f'Delete any existing database named "{DB_NAME}".')
         self.options, _ = arg_parser.parse_known_args()
 
         # Connect to couchdb
@@ -102,7 +102,7 @@ class ContentLoader(object):
 
         # Delete the database
         elif self.options.delete_db:
-            confirm = input('Delete the database "{}" [y/N]? '.format(DB_NAME))
+            confirm = input(f'Delete the database "{DB_NAME}" [y/N]? ')
             if confirm.lower() == 'y':
                 self.unwatch()
                 del self.couch[DB_NAME]
@@ -168,7 +168,7 @@ class ContentLoader(object):
             self.generate_previews()
 
             if full_reload:
-                log('db: replacing database "{}"'.format(DB_NAME))
+                log(f'db: replacing database "{DB_NAME}"')
                 del self.couch[DB_NAME]
                 self.db_get_or_create()
                 # After deleting the database, re-configure and re-watch
@@ -323,7 +323,7 @@ class ContentLoader(object):
                 # Module exists
                 if content:
                     if link_text:
-                        replacement = '[%s]({})'.format(xref_pat) % (link_text, content['slug'])
+                        replacement = f'[%s]({xref_pat})' % (link_text, content['slug'])
                     else:
                         if language == language_default:
                             link_text = nest_parens(content['title'], 1)
@@ -429,7 +429,7 @@ class ContentLoader(object):
         if confidence > 90:
             if item_name not in rename_cache:
                 rename_cache.add(item_name)
-                log("renamed: reference changed from '{}' to '{}'".format(item_name, renamed[match]))
+                log(f'renamed: reference changed from "{item_name}" to "{renamed[match]}"')
             item_name = renamed[match]
 
         # Perform the actual match
@@ -456,7 +456,7 @@ class ContentLoader(object):
         # Handle one or many docs
         docs = [doc_or_docs] if isinstance(doc_or_docs, dict) else doc_or_docs
 
-        log('db: storing {} doc(s)'.format(len(docs)))
+        log(f'db: storing {len(docs)} doc(s)')
         # Remove couch-disallowed keys and add _id where needed
         docs = [{k:v for k,v in d.items() if k in ('_id', '_rev') or not k.startswith('_')} for d in docs]
         [d.update(_id='{type}:{slug}'.format(**d)) for d in docs if '_id' not in d]
@@ -523,7 +523,7 @@ class ContentLoader(object):
 
         # Save the config before creating lots of temporary language-related data within it
         c.update(type='config', slug='api')
-        log('load: configuration options from drive document "{}"'.format(DRIVE_CONFIG_FILE_NAME))
+        log(f'load: configuration options from drive document "{DRIVE_CONFIG_FILE_NAME}"')
         self.db_save(c)
 
         # Key transformations have to take into account language suffixes, so this adds suffixed copies
@@ -543,13 +543,13 @@ class ContentLoader(object):
         now = datetime.utcnow()
         expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
         self.drive.execute(self.drive.service.changes().watch(body={
-            'id': '{}-{}'.format(DRIVE_CLIENT_NAME, expiration),
+            'id': f'{DRIVE_CLIENT_NAME}-{expiration}',
             'type': 'web_hook',
             'address': url,
             'token': API_NOTIFICATION_TOKEN,
             'expiration': expiration,
         }))
-        log("watch: for push notifications at {}".format(url))
+        log(f"watch: for push notifications at {url}")
     
     
     def unwatch(self):
@@ -564,7 +564,7 @@ class ContentLoader(object):
                             'id': channel, 
                             'resourceId': resource,
                         }))
-                        warn("stop: Channel-Id: {} Resource-Id: {}".format(channel, resource))
+                        warn(f"stop: Channel-Id: {channel} Resource-Id: {resource}")
                     except: pass
             del self.db['config:notification-channels']
 
@@ -587,7 +587,7 @@ class ContentLoader(object):
                     yield from get_folders(folder)
             for folder in get_folders(self.root):
                 documents.extend(folder.documents)
-                log('find: content in drive folder "{}"'.format(folder.title))
+                log(f'find: content in drive folder "{folder.title}"')
         return documents
 
 
@@ -610,7 +610,7 @@ class ContentLoader(object):
         content['type'] = type
         content['title'] = title = content.get(type)
         if not isinstance(title, str): 
-            warn("skip: {} bad type information".format(document.id))
+            warn(f"skip: {document.id} bad type information")
             return
 
         # Add a few useful bits
@@ -636,7 +636,7 @@ class ContentLoader(object):
                 content[plural_key] = (multiline if len(multiline) > 1 else 
                                        re.split(self.config['plural-separator-regex'], plural))
 
-        log("extract: {} ({}: {})".format(document.id, type, content['title']))
+        log(f"extract: {document.id} ({type}: {content['title']})")
         return content
 
 
@@ -736,11 +736,11 @@ class ContentLoader(object):
         for translation in content_translated:
             default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=90)
             if not default:
-                warn("skip: {} can't find default language version {}".format(translation.get('title'), translation.get('default-language-content')))
+                warn(f"skip: {translation.get('title')} can't find default language version {translation.get('default-language-content')}")
                 continue
             translations = default.setdefault('translations', {})
             translations[translation['lang']] = translation
-            log("merge: {} ({}) => {}".format(translation['title'], translation['lang'], default['title']))
+            log(f"merge: {translation['title']} ({translation['lang']}) => {default['title']}")
 
         # Recursive in-place dictionary merging function to be used on COPIES of destination dicts
         def merge_dicts(dest, src):
@@ -887,13 +887,12 @@ class ContentLoader(object):
                 for file in folder.files:
                     convert = force_conversion
                     if file.save_as(file.title):
-                        log('download: asset "{}"'.format(file.title))
+                        log(f'download: asset "{file.title}"')
                         convert = True
                     if convert and file.attributes['mimeType'] in ('image/gif', 'image/png', 'image/jpeg'):
-                        log('convert: asset "{}"'.format(file.title))
+                        log(f'convert: asset "{file.title}"')
                         for prefix,args in self.config['asset-manipulation'].items():
-                            Popen(['convert', *shlex.split(args),
-                                   file.title, '{}-{}'.format(prefix, file.title)])
+                            Popen(['convert', *shlex.split(args), file.title, f'{prefix}-{file.title}'])
 
 
 if __name__ == '__main__':

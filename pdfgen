@@ -50,18 +50,18 @@ PDF_LIMIT = '5/minute'
 
 app = Flask(__name__)
 limiter = Limiter(app, key_func=get_remote_address)
-config = requests.get('{}{}/config'.format(API_SERVER, API_PATH)).json()
+config = requests.get(f'{API_SERVER}{API_PATH}/config').json()
 
 
 # A language-keyed dict of dicts containing text for outgoing emails
 # Since this is fetched once at server launch, updates require a restart
 email_text = {lang: {
-        'from_': '{} <noreply@beautifulrising.org>'.format(plucks(text, 'email.from')),
+        'from_': f'{plucks(text, "email.from")} <noreply@beautifulrising.org>',
         'subject': plucks(text, 'email.subject'),
         'message': plucks(text, 'email.message'),
         # Mailgun has issues with non-ascii filenames
         'filename': 'beautifulrising.pdf'
-    } for lang, text in {lang: requests.get('{}{}/text/pdf?lang={}'.format(API_SERVER, API_PATH, lang)).json()
+    } for lang, text in {lang: requests.get(f'{API_SERVER}{API_PATH}/text/pdf?lang={lang}').json()
                          for lang in config['language-all']}.items()}
 
 
@@ -163,7 +163,7 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
     c = cache.setdefault(lang, {})
     
     if now - c.get('last_request', 0) > PDF_API_CACHE_LIFESPAN:
-        content = requests.get('{}{}/all?lang={}'.format(API_SERVER, API_PATH, lang)).json()
+        content = requests.get(f'{API_SERVER}{API_PATH}/all?lang={lang}').json()
 
         c['people'] = {o.get('slug'): o for o in content if o.get('type') == 'person'}
         c['texts'] = {o.get('slug'): o for o in content if o.get('type') == 'text'}
@@ -205,7 +205,7 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
                     m[type_] = [(TOOL_URL % s, titles.get(s, s)) for s in m[type_]]
 
         c['last_request'] = now
-        log('pdfgen: fetching {} modules'.format(lang))
+        log(f'pdfgen: fetching {lang} modules')
 
     # When no module_slugs are provided, all modules are used
     if not module_slugs:
@@ -240,7 +240,7 @@ def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}):
     if now - last_generation.get(unique_hash, 0) < PDF_CACHE_LIFESPAN:
         try:
             with script_subdirectory('pdfcache'):
-                with open('{}.pdf'.format(unique_hash), 'rb') as f:
+                with open(f'{unique_hash}.pdf', 'rb') as f:
                     log('pdfgen: sending cached pdf')
                     return f.read()
         except OSError: pass
@@ -252,7 +252,7 @@ def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}):
     embed_fonts = False
     type_order = [config['plural-name-for-type'][t] for t in TYPE_ORDER]
     modules, people, text = get_modules_people_and_text(modules, lang)
-    log('pdfgen: generating pdf of {} module(s)'.format(len(modules)))
+    log(f'pdfgen: generating pdf of {len(modules)} module(s)')
 
     with script_directory():
         with open('pdftemplate.html') as f:
@@ -260,21 +260,21 @@ def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}):
     html = template.render(markdown=markdown, **__builtins__.__dict__, **vars())
 
     with script_subdirectory('pdfcache') as subdirectory:
-        with open('{}.html'.format(unique_hash), 'w') as f:
+        with open(f'{unique_hash}.html', 'w') as f:
             f.write(html)
 
-        phantom.get('file:///{}/{}.html'.format(subdirectory, unique_hash))
-        phantom_execute('''this.paperSize = {{
-            format: "{}",
+        phantom.get(f'file:///{subdirectory}/{unique_hash}.html')
+        phantom_execute(f'''this.paperSize = {{
+            format: "{paper_size}",
             orientation: "portrait", 
             margin: {{
                 top: "20px", bottom: "20px",
                 left: "30px", right: "30px"
             }}
-        }};'''.format(paper_size))
-        phantom_execute('this.render("{}/{}.pdf");'.format(subdirectory, unique_hash))
+        }};''')
+        phantom_execute(f'this.render("{subdirectory}/{unique_hash}.pdf");')
 
-        with open('{}.pdf'.format(unique_hash), 'rb') as f:
+        with open(f'{unique_hash}.pdf', 'rb') as f:
             pdf = f.read()
 
     phantom_exit()
@@ -340,7 +340,7 @@ def pdf(request_type):
     download = request.args.get('download', '')
 
     # Create a unique hash of the PDF's specifics
-    unique = '{}{}{}'.format(sorted(set(modules)), lang, size)
+    unique = f'{sorted(set(modules))}{lang}{size}'
     unique_hash = md5(unique.encode()).hexdigest()
 
     if request_type in ('email', 'download'):
@@ -351,8 +351,7 @@ def pdf(request_type):
 
         elif request_type == 'download':
             pdf = make_pdf(modules, lang, size, unique_hash)
-            headers = {'Content-Disposition': 'attachment; filename="beautifulrising-{}.pdf"'
-                .format(unique_hash[:5])} if download else {}
+            headers = {'Content-Disposition': f'attachment; filename="beautifulrising-{unique_hash[:5]}.pdf"'} if download else {}
             return Response(pdf, mimetype='application/pdf', headers=headers)
 
     raise BadRequest

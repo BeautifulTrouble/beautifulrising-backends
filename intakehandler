@@ -144,7 +144,7 @@ def fruit_salad(string):
     randomly colored text. It serves no other practical purpose.
     '''
     colors = '4d4d4d 5da5da faa43a 60bd68 f17cb0 b2912f b276b2 decf3f f15854'.split()
-    return ''.join('<span style="color:#{}">{}</span>'.format(random.choice(colors), c)
+    return ''.join(f'<span style="color:#{random.choice(colors)}">{c}</span>'
                    for i,c in enumerate(string))
 
 
@@ -157,7 +157,7 @@ def handle_real_world_examples(form):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(API_NOTIFICATION_EMAIL, 'A new real world example has been contributed',
-        'Real World Example suggestions are here:\n{}'.format(output_link))
+        f'Real World Example suggestions are here:\n{output_link}')
 
 
 def handle_newsfeed_suggestion(form):
@@ -167,7 +167,7 @@ def handle_newsfeed_suggestion(form):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(API_NOTIFICATION_EMAIL, 'A new newsfeed suggestion has been contributed',
-        'The suggestion is: {}\n\nAll newsfeed suggestions are here:\n{}'.format(form.get('suggestion'), output_link))
+        f'The suggestion is: {form.get("suggestion")}\n\nAll newsfeed suggestions are here:\n{output_link}')
 
 
 def handle_resource_suggestion(form):
@@ -177,7 +177,7 @@ def handle_resource_suggestion(form):
     # Send email notification of the contribution
     output_link = get_file_attribute(doc, 'alternateLink')
     send_mail(API_NOTIFICATION_EMAIL, 'A new resource suggestion has been contributed',
-        'The suggestion is: {}\n\nAll resource suggestions are here:\n{}'.format(form.get('title'), output_link))
+        f'The suggestion is: {form.get("title")}\n\nAll resource suggestions are here:\n{output_link}')
 
 
 def handle_contributor_question(form):
@@ -185,30 +185,30 @@ def handle_contributor_question(form):
     question = form['question']
     contributors = form['contributors']
     if email:
-        question = '{} asked:\n\n{}'.format(email, question)
+        question = f'{email} asked:\n\n{question}'
 
     for contributor in contributors:
-        url = '{}{}/person/{}'.format(API_SERVER, API_PATH, contributor)
+        url = f'{API_SERVER}{API_PATH}/person/{contributor}'
         try:
             j = requests.get(url, headers={'x-api-admin-token': API_ADMIN_TOKEN}).json()
             contributor_emails = j.get('emails', [])
             contributor_name = j.get('title', contributor)
         except requests.RequestException:
             send_mail(API_NOTIFICATION_EMAIL,
-                "Failed to send question to Beautiful Rising contributor {}".format(contributor), question)
+                f"Failed to send question to Beautiful Rising contributor {contributor}", question)
         for email in contributor_emails:
             send_mail(email, 'A Beautiful Rising user asked...', question)
-        send_mail(API_NOTIFICATION_EMAIL, 'A Beautiful Rising user contacted {}...'.format(contributor_name), question)
+        send_mail(API_NOTIFICATION_EMAIL, f'A Beautiful Rising user contacted {contributor_name}...', question)
 
 
 # When properly invoked, call an appropriate handle_* function
 # ////////////////////////////////////////////////////////////////////////////
 if __name__ == '__main__':
     with only_one_process('intake'):
-        handler = globals().get('handle_%s' % sys.argv[1].replace('-','_'))
+        handler = globals().get(f'handle_{sys.argv[1].replace("-", "_")}')
         if handler and callable(handler):
-            log("intake: Handing {}".format(sys.argv[1]))
+            log(f"intake: Handing {sys.argv[1]}")
             handler(json.loads(sys.argv[2]))
         else:
-            warn("intake: Not handing {}".format(sys.argv[1]))
+            warn(f"intake: Not handing {sys.argv[1]}")
 

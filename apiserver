@@ -69,7 +69,7 @@ def google_verification():
     '''
     Keep the googles happy
     '''
-    return 'google-site-verification: {}'.format(GOOGLE_VERIFICATION)
+    return f'google-site-verification: {GOOGLE_VERIFICATION}'
 
 
 # Drive change notification
@@ -92,7 +92,7 @@ def notify():
 
     # Save new notification ids so they can be cancelled
     if state == 'sync':
-        log("sync: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
+        log(f"sync: Channel-Id: {channel_id} Resource-Id: {resource_id}")
         try:
             channels = db['config:notification-channels']
             channels[channel_id] = resource_id
@@ -109,7 +109,7 @@ def notify():
 
     # Attempt to invoke the content loader
     elif state == 'change':
-        log("changed: Channel-Id: {} Resource-Id: {}".format(channel_id, resource_id))
+        log(f"changed: Channel-Id: {channel_id} Resource-Id: {resource_id}")
         body = request.get_json()
         if body:
             with script_directory():
@@ -121,7 +121,7 @@ def notify():
         body = request.get_json()
         if body and 'document_id' in body:
             doc_id = body['document_id']
-            log("update: {}".format(doc_id))
+            log(f"update: {doc_id}")
             with script_directory():
                 venv_run("contentloader", "--id", doc_id)
 
@@ -208,7 +208,7 @@ def intake(feature):
             venv_run('intakehandler', feature, json.dumps(body))
             return '', 204
     schema = pprint.pformat(dict(validator.schema))
-    return 'Validation Failed. Use reCAPTCHA and the following schema:\n{}'.format(schema), 400
+    return f'Validation Failed. Use reCAPTCHA and the following schema:\n{schema}', 400
 
 
 # Output filtering
@@ -386,15 +386,15 @@ for singular_name,plural_name in types.items():
             try:
                 return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Many, '{API_PATH}/{plural_name}'.format(**vars()), endpoint=plural_name)
+    api.add_resource(Many, f'{API_PATH}/{plural_name}', endpoint=plural_name)
 
     class One(Resource):
         type = singular_name
         def get(self, id):
             try:
-                return filter_output(db['{}:{}'.format(self.type, id)])
+                return filter_output(db[f'{self.type}:{id}'])
             except ResourceNotFound: raise NotFound
-    api.add_resource(One, '{API_PATH}/{singular_name}/<id>'.format(**vars()), endpoint=singular_name)
+    api.add_resource(One, f'{API_PATH}/{singular_name}/<id>', endpoint=singular_name)
 
 
 # Get the grouped types and create endpoints
@@ -408,7 +408,7 @@ for group,types in groups.items():
             try:
                 return filter_output([doc['value'] for doc in db.query(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Group, '{API_PATH}/{group}'.format(**vars()), endpoint=group)
+    api.add_resource(Group, f'{API_PATH}/{group}', endpoint=group)
 
 
 # Just emit all the documents
@@ -418,24 +418,24 @@ class All(Resource):
         try:
             return filter_output([doc['value'] for doc in db.query(self.query)])
         except (KeyError, ResourceNotFound): raise NotFound
-api.add_resource(All, '{API_PATH}/all'.format(**vars()), endpoint='all')
+api.add_resource(All, f'{API_PATH}/all', endpoint='all')
 
 
 # Expose the config for front-ends
 class Config(Resource):
     def get(self):
         return filter_output(dict(config.items()))
-api.add_resource(Config, '{API_PATH}/config'.format(**vars()))
+api.add_resource(Config, f'{API_PATH}/config')
 
 
 # Expose the endpoints themselves
 class Endpoints(Resource):
     def get(self):
         return {rule.endpoint: {
-                'url': unquote(url_for(rule.endpoint, **{a: '<{}>'.format(a) for a in rule.arguments})),
+                'url': unquote(url_for(rule.endpoint, **{a: f'<{a}>' for a in rule.arguments})),
                 'methods': list(rule.methods),
             } for rule in app.url_map.iter_rules()}
-api.add_resource(Endpoints, '{API_PATH}'.format(**vars()))
+api.add_resource(Endpoints, f'{API_PATH}')
 
 
 # Run when invoked from the command line
