@@ -87,7 +87,11 @@ class ContentLoader(object):
 
         # Generate fresh site previews
         elif self.options.regenerate_previews:
-            self.regenerate_previews()
+            all_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc]
+            for content in all_content:
+                self.enqueue_previews_and_update_rwes(content)
+            self.generate_previews()
+            self.db_save(all_content)
 
         # Watch for changes
         elif self.options.watch_docs:
@@ -849,18 +853,6 @@ class ContentLoader(object):
         '''
         log(f'siteprev: generating for {len(self.preview_queue)} url(s)')
         venv_run('sitepreview', json.dumps(self.preview_queue))
-
-
-    def regenerate_previews(self):
-        '''
-        Generate previews on existing db
-        '''
-        self.db_get_or_create()
-        all_content = [d.doc for d in self.db.view('_all_docs', include_docs=True) if 'document_id' in d.doc]
-        for content in all_content:
-            self.enqueue_previews_and_update_rwes(content)
-        self.generate_previews()
-        self.db_save(all_content)
 
 
     def enqueue_previews_and_update_rwes(self, content):
