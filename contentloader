@@ -55,6 +55,10 @@ class ContentLoader(object):
             help="Initiate a request to watch drive for changes. It will expire in one day.")
         arg_parser_group.add_argument('--stop-watching', action='store_true', 
             help="If the db has any record of a watch request, request that it be cancelled.")
+        arg_parser_group.add_argument('--local', action='store_true',
+            help="Use locally cached data rather than fetching it from google drive.")
+        arg_parser_group.add_argument('--save-local', action='store_true',
+            help="Save local cache of data for use with --local and quit.")
         arg_parser_group.add_argument('--delete-db', action='store_true',
             help='Delete any existing database named "{}".'.format(DB_NAME))
         self.options,_ = arg_parser.parse_known_args()
@@ -106,9 +110,26 @@ class ContentLoader(object):
             #TODO: in production always unwatch/watch
             #TODO: handle document renaming/deletion
 
-            # Identify published documents by their filenames and fetch new content
-            published = re.compile(self.config['published-filename-regex']).search
-            published_documents = [d for d in self.get_documents() if published(d.title) or d.id in self.options.ids]
+            if self.options.local:
+                with script_directory():
+                    try:
+                        with open(DRIVE_CACHE_FILE_NAME) as f:
+                            log('local: loading local cache of drive content')
+                            published_documents = json.load(f, object_hook=driveclient_document_json_decoder)
+                    except FileNotFoundError:
+                        die(f"local: can't find local cache {DRIVE_CACHE_FILE_NAME}")
+
+            else:
+                # Identify published documents by their filenames and fetch new content
+                published = re.compile(self.config['published-filename-regex']).search
+                published_documents = [d for d in self.get_documents() if published(d.title) or d.id in self.options.ids]
+
+                if self.options.save_local or True:
+                    with script_directory():
+                        with open(DRIVE_CACHE_FILE_NAME, 'w') as f:
+                            json.dump(published_documents, f, default=driveclient_document_json_encoder)
+                            log('local: saved local cache of drive content', fatal=True)
+
             if not published_documents:
                 warn('skip: no documents to load', fatal=True)
             new_content = filter(None, map(self.extract_and_transform, published_documents))

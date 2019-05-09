@@ -12,6 +12,7 @@ from subprocess import Popen
 import archieml
 import magic
 import unidecode
+import driveclient
 
 
 DEBUG = '--debug' in sys.argv
@@ -28,15 +29,32 @@ ARABIC_RANGES = r'\u0600-\u06ff\u0750-\u077f\ufb50-\ufbc1\ufbd3-\ufd3f'\
 ARABIC_BOUNDARY_REGEX = r'(?:(?<=[^\w{0}])(?=[\w{0}])|(?<=[\w{0}])(?=[^\w{0}]))'.format(ARABIC_RANGES)
 
 
-class JSONEncoder(json.JSONEncoder):
+class PhonyDriveFileWithText(driveclient.DriveFile):
     '''
-    JSON encoder which invokes magic _json method on custom classes
+    For use with the driveclient_document_json_decoder
     '''
-    def default(self, obj):
-        try:
-            return obj._json()
-        except AttributeError:
-            return json.JSONEncoder.default(self, obj)
+    text = property(lambda self: self.attributes['__text'])
+
+
+def driveclient_document_json_encoder(obj):
+    '''
+    Serialize a driveclient.DriveFile document by eagerly downloading its text
+    '''
+    if isinstance(obj, driveclient.DriveObject):
+        log(f"extract: {obj.id} ({obj.title})")
+        obj.attributes['__text'] = obj.text
+        return obj.attributes
+    return json.JSONEncoder.default(obj)
+
+
+def driveclient_document_json_decoder(dct):
+    '''
+    Return a driveclient.DriveFile object with its text property replaced
+    by the text saved by driveclient_document_json_encoder
+    '''
+    if dct.get('kind') == 'drive#file':
+        return PhonyDriveFileWithText(..., dct)
+    return dct
 
 
 @contextlib.contextmanager
@@ -209,7 +227,8 @@ __all__ = [
     'DEBUG',
     'DEVELOP',
     'ARABIC_BOUNDARY_REGEX',
-    'JSONEncoder',
+    'driveclient_document_json_encoder',
+    'driveclient_document_json_decoder',
     'script_directory', 
     'script_subdirectory', 
     'only_one_process',
