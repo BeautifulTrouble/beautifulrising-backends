@@ -38,30 +38,28 @@ class ContentLoader(object):
     def __init__(self):
         # Parse command line arguments
         arg_parser = argparse.ArgumentParser(description="")
-        arg_parser_group = arg_parser.add_mutually_exclusive_group()
-        arg_parser_group.add_argument('--id', type=google_doc_id, metavar='DOCUMENT_ID', action='append',
-            default=[], dest='ids', help="Fetch a single document by its globally unique id, "
-            "then update associated metadata and assets. Specify multiple times to get multiple "
-            "documents at once.")
-        arg_parser_group.add_argument('--change-id', type=str, metavar='CHANGE_ID', action='append', 
-            default=[], dest='changes', help="Fetch a single document by its ephemeral change id, "
-            "then update associated metadata and assets. Specify multiple times to get multiple "
-            "documents at once.")
-        arg_parser_group.add_argument('--assets', action='store_true', help="Download and convert "
-            "all assets. Use after changing asset settings in the config.")
-        arg_parser_group.add_argument('--regenerate-previews', action='store_true', help="Update "
-            "external site preview images.")
-        arg_parser_group.add_argument('--watch-docs', action='store_true',
-            help="Initiate a request to watch drive for changes. It will expire in one day.")
-        arg_parser_group.add_argument('--stop-watching', action='store_true', 
-            help="If the db has any record of a watch request, request that it be cancelled.")
-        arg_parser_group.add_argument('--local', action='store_true',
-            help="Use locally cached data rather than fetching it from google drive.")
-        arg_parser_group.add_argument('--save-local', action='store_true',
+        exclusive_args = arg_parser.add_mutually_exclusive_group()
+        exclusive_args.add_argument('--id', type=google_doc_id, metavar='DOCUMENT_ID', action='append', default=[], dest='ids',
+            help="Fetch a single document by its globally unique id, then update associated metadata and assets. Specify multiple times to get multiple documents at once.")
+        exclusive_args.add_argument('--change-id', type=str, metavar='CHANGE_ID', action='append', default=[], dest='changes',
+            help="Fetch a single document by its ephemeral change id, then update associated metadata and assets. Specify multiple times to get multiple documents at once.")
+        exclusive_args.add_argument('--assets', action='store_true',
+            help="Download and convert all assets and quit.")
+        exclusive_args.add_argument('--regenerate-previews', action='store_true',
+            help="Update external site preview images and quit.")
+        arg_parser.add_argument('--no-previews', action='store_true',
+            help="Skip site preview generation.")
+        exclusive_args.add_argument('--watch-docs', action='store_true',
+            help="Initiate a request to watch drive for changes and quit. It will expire in one day.")
+        exclusive_args.add_argument('--stop-watching', action='store_true',
+            help="If the db has any record of a watch request, request that it be cancelled and quit.")
+        exclusive_args.add_argument('--local', action='store_true',
+            help="Perform a full reload using locally cached data rather than fetching it from google drive.")
+        exclusive_args.add_argument('--save-local', action='store_true',
             help="Save local cache of data for use with --local and quit.")
-        arg_parser_group.add_argument('--delete-db', action='store_true',
+        exclusive_args.add_argument('--delete-db', action='store_true',
             help='Delete any existing database named "{}".'.format(DB_NAME))
-        self.options,_ = arg_parser.parse_known_args()
+        self.options, _ = arg_parser.parse_known_args()
 
         # Connect to couchdb
         self.couch = couchdb.Server(DB_SERVER)
@@ -851,8 +849,12 @@ class ContentLoader(object):
         '''
         Launch external preview generation tool
         '''
-        log(f'siteprev: generating for {len(self.preview_queue)} url(s)')
-        venv_run('sitepreview', json.dumps(self.preview_queue))
+        if not self.options.no_previews:
+            log(f'siteprev: generating for {len(self.preview_queue)} url(s)')
+            venv_run('sitepreview', json.dumps(self.preview_queue))
+        else:
+            warn(f'siteprev: not generating for {len(self.preview_queue)} url(s)')
+
 
 
     def enqueue_previews_and_update_rwes(self, content):
