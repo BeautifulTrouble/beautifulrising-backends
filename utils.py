@@ -2,6 +2,7 @@
 import contextlib
 import datetime
 import fcntl
+import inspect
 import json
 import os
 import re
@@ -61,13 +62,15 @@ def driveclient_document_json_decoder(dct):
 def script_directory():
     '''
     A context manager which allows you to write blocks of code which run within 
-    this script's directory. The working directory is restored afterward.
+    a script's directory. The working directory is restored afterward.
     '''
     cwd = os.getcwd()
-    directory = os.path.dirname(os.path.realpath(__file__))
-    os.chdir(directory)
+    # Frames are: script_directory -> contextlib.contextmanager -> caller
+    caller = inspect.getouterframes(inspect.currentframe())[2]
+    script_dir = os.path.dirname(os.path.realpath(caller.filename))
+    os.chdir(script_dir)
     try:
-        yield directory
+        yield script_dir
     finally:
         os.chdir(cwd)
 
@@ -76,20 +79,23 @@ def script_directory():
 def script_subdirectory(name):
     '''
     A context manager which allows you to write blocks of code which run within 
-    a subdirectory of this script's directory. The subdirectory is created if it
-    does not exist, and the working directory is restored after completion.
+    a subdirectory of the calling script's directory. The subdirectory is created
+    if it does not exist, and the working directory is restored after completion.
 
     >>> with script_subdirectory("html"):
     ...    output_templates()
     '''
     cwd = os.getcwd()
-    subdirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)), name)
-    if not os.path.exists(subdirectory):
-        os.makedirs(subdirectory)
-        log(f'mkdir: {subdirectory}')
-    os.chdir(subdirectory)
+    # Frames are: script_directory -> contextlib.contextmanager -> caller
+    caller = inspect.getouterframes(inspect.currentframe())[2]
+    script_dir = os.path.dirname(os.path.realpath(caller.filename))
+    script_subdir = os.path.join(script_dir, name)
+    if not os.path.exists(script_subdir):
+        os.makedirs(script_subdir)
+        log(f'mkdir: {script_subdir}')
+    os.chdir(script_subdir)
     try: 
-        yield subdirectory
+        yield script_subdir
     finally: 
         os.chdir(cwd)
 
