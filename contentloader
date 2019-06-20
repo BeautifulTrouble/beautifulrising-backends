@@ -425,12 +425,12 @@ class ContentLoader(object):
 
         # First determine whether the item_name refers to a module which has been renamed
         renamed = self.config['renamed-modules']
-        match, confidence = extractOne(item_name, renamed.keys())
-        if confidence > 90:
+        match = extractOne(item_name, renamed.keys())
+        if match and match[1] >= 90:
             if item_name not in rename_cache:
                 rename_cache.add(item_name)
-                log(f'renamed: reference changed from "{item_name}" to "{renamed[match]}"')
-            item_name = renamed[match]
+                log(f'renamed: reference changed from "{item_name}" to "{renamed[match[0]]}"')
+            item_name = renamed[match[0]]
 
         # Perform the actual match
         match = extractOne(item_name, item_list, processor=lambda m: m.get('title', ''))
