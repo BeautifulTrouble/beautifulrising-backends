@@ -59,6 +59,9 @@ class ContentLoader(object):
             help="Save local cache of data for use with --local and quit.")
         exclusive_args.add_argument('--delete-db', action='store_true',
             help=f'Delete any existing database named "{DB_NAME}".')
+        exclusive_args.add_argument('--test-match', type=str, metavar='SLUG',
+            help="Fuzzy match the given slug against existing content")
+
         self.options, _ = arg_parser.parse_known_args()
 
         # Connect to couchdb
@@ -90,6 +93,15 @@ class ContentLoader(object):
                 self.enqueue_previews_and_update_rwes(content)
             self.generate_previews()
             self.db_save(all_content)
+
+        # Test fuzzy matcher against existing content
+        elif self.options.test_match:
+            all_slugs = [d.doc['slug'] for d in self.db.view('_all_docs', include_docs=True)]
+            match = self.find_fuzzy(self.options.test_match, all_slugs, 90)
+            if match:
+                log('fuzzy: Found match "{}" for string "{}"'.format(match, self.options.test_match))
+            else:
+                log('fuzzy: No match for string "{}"'.format(self.options.test_match))
 
         # Watch for changes
         elif self.options.watch_docs:
