@@ -1,4 +1,5 @@
 
+import atexit
 import contextlib
 import datetime
 import fcntl
@@ -7,7 +8,8 @@ import json
 import os
 import re
 import sys
-from functools import reduce
+import time
+from functools import reduce, wraps
 from subprocess import Popen
 
 import archieml
@@ -189,6 +191,22 @@ def strip_smartquotes(s):
     return reduce(replace, pairs, s)
 
 
+def timecalls(f):
+    '''
+    For simple profiling, report total time of decorated function at program exit
+    '''
+    f._timecalls_total = 0
+    atexit.register(lambda f:
+        warn(f'timecalls: {f.__code__.co_name}: {f._timecalls_total}', color='cyan'), f)
+    @wraps(f)
+    def wrapper(*a, **kw):
+        t0 = time.time()
+        res = f(*a, **kw)
+        f._timecalls_total += time.time() - t0
+        return res
+    return wrapper
+
+
 def log(*s, fatal=False, tty=sys.stdout.isatty(), color='green', **kw):
     '''
     Tee-style logging with timestamps
@@ -233,6 +251,7 @@ __all__ = [
     'DEBUG',
     'DEVELOP',
     'ARABIC_BOUNDARY_REGEX',
+    'PhonyDriveFileWithText',
     'driveclient_document_json_encoder',
     'driveclient_document_json_decoder',
     'script_directory', 
@@ -245,6 +264,7 @@ __all__ = [
     'slugify', 
     'nest_parens',
     'strip_smartquotes',
+    'timecalls',
     'log', 
     'warn',
     'die', 
