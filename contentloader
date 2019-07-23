@@ -569,15 +569,16 @@ class ContentLoader(object):
         Request all push notification channels in db be cancelled
         '''
         if 'config:notification-channels' in self.db:
-            for channel,resource in self.db['config:notification-channels'].items():
-                if channel not in ('_id', '_rev'):
+            for channel, resource in self.db['config:notification-channels'].items():
+                if channel.startswith(DRIVE_CLIENT_NAME):
                     try:
                         self.drive.execute(self.drive.service.channels().stop(body={
                             'id': channel, 
                             'resourceId': resource,
                         }))
                         warn(f"stop: Channel-Id: {channel} Resource-Id: {resource}")
-                    except: pass
+                    except Exception as e:
+                        warn(f"unwatch: {e}")
             del self.db['config:notification-channels']
 
 
