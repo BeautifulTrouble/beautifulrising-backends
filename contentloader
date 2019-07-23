@@ -735,18 +735,20 @@ class ContentLoader(object):
         #language_add = self.config['language-add']
         #language_remove = self.config['language-remove']
         content_primary = []
+        content_primary_by_type = {}
         content_translated = []
 
         # Sort content by language
         for content in all_content:
             if content['lang'] == language_default:
                 content_primary.append(content)
+                content_primary_by_type.setdefault(content['type'], []).append(content)
             else:
                 content_translated.append(content)
 
         # Add translated content to a translations dict in each default language piece
         for translation in content_translated:
-            default = self.find_content(translation.get('default-language-content', ''), content_primary, thresh=90)
+            default = self.find_content(translation.get('default-language-content', ''), content_primary_by_type[translation['type']], thresh=90)
             if not default:
                 warn(f"skip: {translation.get('title')} can't find default language version {translation.get('default-language-content')}")
                 continue
