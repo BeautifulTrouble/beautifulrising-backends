@@ -180,12 +180,14 @@ class ContentLoader(object):
             self.generate_previews()
 
             if full_reload:
+                production = not (DEBUG or DEVELOP)
+                if production:
+                    self.unwatch()
                 log(f'db: replacing database "{DB_NAME}"')
                 del self.couch[DB_NAME]
                 self.db_get_or_create()
-                # After deleting the database, re-configure and re-watch
                 self.configure()
-                if not (DEBUG or DEVELOP):
+                if production:
                     self.watch()
 
             self.db_save(all_content)
