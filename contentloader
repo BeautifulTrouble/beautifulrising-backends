@@ -105,7 +105,6 @@ class ContentLoader(object):
 
         # Watch for changes
         elif self.options.watch_docs:
-            self.unwatch()
             self.watch()
 
         # Stop watching for changes
@@ -553,6 +552,7 @@ class ContentLoader(object):
         '''
         Request push notifications for entire drive be sent to the API_NOTIFICATION_PATH
         '''
+        self.unwatch()
         url = urljoin(API_SERVER, API_NOTIFICATION_PATH)
         now = datetime.utcnow()
         expiration = int((60*60*24 + now.timestamp()) * 1000) # UTC + 24h in ms
