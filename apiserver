@@ -101,12 +101,6 @@ def notify():
             channels.update(_id='config:notification-channels', type='config', slug='notification-channels')
         db.save(channels)
 
-    # Notify that a document is no longer in the collection
-    # TODO: new document tracking system by id
-    elif state == 'delete':
-        print('delete', request.get_json())
-        # XXX: venv_run("contentloader", "--delete-id", doc_id)
-
     # Attempt to invoke the content loader
     elif state == 'change':
         log(f"changed: Channel-Id: {channel_id} Resource-Id: {resource_id}")
