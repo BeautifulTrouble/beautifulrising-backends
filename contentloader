@@ -497,7 +497,6 @@ class ContentLoader(object):
         # Language settings
         c.setdefault('language-default', 'en')
         c.setdefault('language-all', ['en'])
-        c.setdefault('language-add', '')
         c.setdefault('language-remove', '')
         c.setdefault('language-detection-weighted-keys', [])
         # How we distinguish published content
@@ -735,7 +734,6 @@ class ContentLoader(object):
         language_all = self.config['language-all']
         language_default = self.config['language-default']
         language_other = set(language_all) - set(language_default)
-        #language_add = self.config['language-add']
         #language_remove = self.config['language-remove']
         content_primary = []
         content_primary_by_type = {}

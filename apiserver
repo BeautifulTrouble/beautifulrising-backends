@@ -232,7 +232,6 @@ def filter_output(resources):
         resources = [resources]
 
     language_all = config['language-all']
-    language_add = config['language-add']
     language_default = config['language-default']
     language_remove = set(config['language-remove'])
     language_ignore_missing = language_remove | {
@@ -269,15 +268,9 @@ def filter_output(resources):
             # Keep track of the keys which are present in this translation
             language_present = set(translated.keys())
 
-            # Hold these items to be re-added after resource.update
-            preserved = {k:v for k,v in resource.items() if k in language_add}
             # Default language content it here overwritten with translated content
             resource.update({k:v for k,v in translated.items() if k not in language_remove})
-            # Preserved content (from language_add keys) is here added back in
-            for k,item_in_default_language in preserved.items():
-                # Merge one level of nested lists
-                if isinstance(resource[k], list) and isinstance(item_in_default_language, list):
-                    resource[k] += [item for item in item_in_default_language if item not in resource[k]]
+
             # I believe this sets lang for pieces where the translations were created
             # artificially (using suffixed keys) and lang isn't present. If that's the
             # case it probably belongs in the contentloader because this won't be accurate
