@@ -227,8 +227,8 @@ def filter_output(resources):
 
     language_all = config['language-all']
     language_default = config['language-default']
-    language_remove = set(config['language-remove'])
-    language_ignore_missing = language_remove | {
+    language_omit = set(config['language-omit'])
+    language_ignore_missing = language_omit | {
         # Added during standard processing
         'lang', 'type', 'title', 'slug', 'timestamp',
         'document_id', 'document_link', 'document_title',
@@ -263,7 +263,7 @@ def filter_output(resources):
             language_present = set(translated.keys())
 
             # Default language content it here overwritten with translated content
-            resource.update({k:v for k,v in translated.items() if k not in language_remove})
+            resource.update({k:v for k,v in translated.items() if k not in language_omit})
 
             # I believe this sets lang for pieces where the translations were created
             # artificially (using suffixed keys) and lang isn't present. If that's the

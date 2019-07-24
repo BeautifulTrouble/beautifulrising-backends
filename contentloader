@@ -497,7 +497,7 @@ class ContentLoader(object):
         # Language settings
         c.setdefault('language-default', 'en')
         c.setdefault('language-all', ['en'])
-        c.setdefault('language-remove', '')
+        c.setdefault('language-omit', [])
         c.setdefault('language-detection-weighted-keys', [])
         # How we distinguish published content
         c.setdefault('published-filename-regex', r'(?i)\bdone$')
@@ -734,7 +734,7 @@ class ContentLoader(object):
         language_all = self.config['language-all']
         language_default = self.config['language-default']
         language_other = set(language_all) - set(language_default)
-        #language_remove = self.config['language-remove']
+        #language_omit = self.config['language-omit']
         content_primary = []
         content_primary_by_type = {}
         content_translated = []
@@ -788,7 +788,7 @@ class ContentLoader(object):
                     [merge_dicts(v, language_new[k]) for k,v in default_language_dicts_to_merge_into.items()]
                     language_dict.update(default_language_dicts_to_merge_into)
 
-        # TODO: language-add / language-remove (currently performed by API server)
+        # TODO: language-omit (currently performed by API server)
 
         # All content is now in this merged list
         return content_primary
