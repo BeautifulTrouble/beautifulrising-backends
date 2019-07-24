@@ -431,7 +431,7 @@ class ContentLoader(object):
         if not isinstance(item_name, str):
             return {}
 
-        cached = fuzzy_match_cache.setdefault(id(item_list), {}).get(item_name)
+        cached = fuzzy_match_cache.setdefault((id(item_list), len(item_list)), {}).get(item_name)
         if cached:
             return cached
 
@@ -447,7 +447,7 @@ class ContentLoader(object):
         # Perform the actual match
         match = extractOne(item_name, item_list, processor=lambda m: m.get('title', ''))
         if match and match[1] >= thresh:
-            fuzzy_match_cache[id(item_list)][item_name] = match[0]
+            fuzzy_match_cache[id(item_list), len(item_list)][item_name] = match[0]
             return match[0]
         return {}
 
