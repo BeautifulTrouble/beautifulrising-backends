@@ -799,19 +799,19 @@ class ContentLoader(object):
         Replace relationships based on document titles with fuzzy-matched slugs
         '''
         typed_content = {}
-        slugged_content = {}
+        typed_slugged_content = {}
         for content in all_content:
             typed_content.setdefault(content['type'], []).append(content)
-            slugged_content[content['slug']] = content
+            typed_slugged_content.setdefault(content['type'], {})[content['slug']] = content
 
-        # Forward relationships are specified with a mapping of fields to types. Simply replace titles with 
-        # fuzzy-matched slugs, eliminate invalid entries, and remove empty fields.
-        forward = self.config['relationships']['forward']
-        for content in all_content:
-            for field, doc_type in forward.items():
+        # Forward relationships are specified with a mapping of fields to types. This is a time-consuming
+        # but important process. Each entry is written by hand and so must be fuzzy matched for spelling
+        # errors and non-existent related documents.
+        for field, T in self.config['relationships']['forward'].items():
+            possibly_related_docs = all_content if T == 'any' else typed_content.get(T, [])
+            for content in all_content:
                 related_titles = content.get(field)
                 if related_titles is not None:
-                    possibly_related_docs = all_content if doc_type == 'any' else typed_content.get(doc_type, [])
                     if isinstance(related_titles, list):
                         related_docs = (self.find_content(t, possibly_related_docs, 90) for t in related_titles)
                         # Ignore leading hyphens when sorting (Is this sort redundant? Prove it before removing!)
@@ -827,33 +827,44 @@ class ContentLoader(object):
         #   1. The fields containing forward relationships so that forward related docs can be found
         #   2. A mapping of types to the fields which, in those related docs, need to be related back
         backward_groups = [(g, {v: k for k, v in g.items()}) for g in self.config['relationships']['backward']]
-        for content in all_content:
-            slug = content['slug']
-            # Each of these ({field:type}, {type:field}) pairs represents a group of interrelated content
-            for fields_to_types, types_to_fields in backward_groups:
-                # Field relating back to this type
-                field_back = types_to_fields.get(content['type'])
-                if field_back:
-                    # Iterate through everything ~this~ doc relates to and get those docs
-                    related_docs = []
-                    for field in fields_to_types:
-                        related_slugs = content.get(field)
-                        if related_slugs:
-                            if isinstance(related_slugs, str):
-                                related_slugs = [related_slugs]
-                            if isinstance(related_slugs, list):
-                                related_docs.extend([*filter(None, (slugged_content.get(s) for s in related_slugs))])
+        for field_to_type_map, type_to_field_map in backward_groups:
+            for content in all_content:
 
-                    # Now add the backward relationship to every doc
-                    for doc in related_docs:
-                        backward_field = doc.get(field_back)
-                        if isinstance(backward_field, str):
-                            doc[field_back] = slug
-                        elif backward_field is None:
-                            doc[field_back] = [slug]
-                        elif isinstance(backward_field, list):
-                            # Ignore leading hyphens when sorting
-                            doc[field_back] = sorted({slug} | set(backward_field), key=lambda s: s.lstrip('-'))
+                # Get the field which, in other docs, should relate back to this one
+                # For example if this is a story, other docs relate to it with stories
+                related_name = type_to_field_map.get(content['type'])
+                if not related_name:
+                    continue # Nothing to do, proceed to next doc
+
+                # Accumulate all forward-related docs by their slug and type, using the
+                # fields in the field_to_type_map to figure out which fields in this
+                # doc will contain their slugs.
+                related_docs = []
+                for field, T in field_to_type_map.items():
+                    related_slugs = content.get(field)
+                    if not related_slugs:
+                        continue # Proceed to next field
+
+                    if isinstance(related_slugs, str):
+                        related_slugs = [related_slugs]
+                    if isinstance(related_slugs, list):
+                        related_slugs = [*filter(None, (typed_slugged_content.get(T, {}).get(s) for s in related_slugs))]
+                    related_docs.extend(related_slugs)
+
+                # Populate each forward-related doc's appropriate related_name with this doc's
+                # slug. This can be done without checking the destination's validity because
+                # they will have already been checked and slugified.
+                slug = content['slug']
+                for doc in related_docs:
+                    backward_field = doc.get(related_name)
+                    if isinstance(backward_field, str):
+                        doc[related_name] = slug
+                    elif backward_field is None:
+                        doc[related_name] = [slug]
+                    elif isinstance(backward_field, list):
+                        # Ignore leading hyphens when sorting
+                        doc[related_name] = sorted({slug} | set(backward_field), key=lambda s: s.lstrip('-'))
+
         return all_content
 
 
@@ -866,7 +877,6 @@ class ContentLoader(object):
             venv_run('sitepreview', json.dumps(self.preview_queue))
         else:
             warn(f'siteprev: not generating for {len(self.preview_queue)} url(s)')
-
 
 
     def enqueue_previews_and_update_rwes(self, content):
