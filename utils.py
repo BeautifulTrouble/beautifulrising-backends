@@ -44,7 +44,7 @@ def driveclient_document_json_encoder(obj):
     Serialize a driveclient.DriveFile document by eagerly downloading its text
     '''
     if isinstance(obj, driveclient.DriveObject):
-        log(f"extract: {obj.id} ({obj.title})")
+        log(f"download: {obj.id} ({obj.title})")
         obj.attributes['__text'] = obj.text
         return obj.attributes
     return json.JSONEncoder.default(obj)
