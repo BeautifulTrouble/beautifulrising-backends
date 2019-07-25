@@ -307,16 +307,10 @@ class ContentLoader(object):
             'es': f'(ver: [{{0}}: {{1}}]({xref_pat}))',
             'pt': f'(veja: [{{0}}: {{1}}]({xref_pat}))',
         }
-        types = {
-            'en': {'methodology': 'methodology', 'principle': 'principle',
-                'story': 'story', 'tactic': 'tactic', 'theory': 'theory'},
-            'es': {'methodology': 'metodología', 'principle': 'principio',
-                'story': 'historia', 'tactic': 'táctica', 'theory': 'teoría'},
-            'ar': {'methodology': 'منهجية', 'principle': 'مبدأ',
-                'story': 'قصة', 'tactic': 'تكتيك', 'theory': 'نظرية'},
-            'pt': {'methodology': 'metodologia', 'principle': 'princípio',
-                'story': 'história', 'tactic': 'táctica', 'theory': 'teoria'},
-        }
+
+        # Get type names for each language (currently in the config as lang-named keys within types-modules)
+        types = {lang: {T['one']: T.get(lang, T['one']) for T in self.config['types-modules']}
+                 for lang in language_all}
 
         def patch_links(text):
             m, chunks = xref_matcher(text), []
