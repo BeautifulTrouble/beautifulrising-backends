@@ -296,17 +296,12 @@ class ContentLoader(object):
         # capture the full link text. However, if any module names end up with
         # parens in their middles "Like (such as) this", this method will fail.
         xref_matcher = re.compile(r'(?<!!)\[([^\]]*)\]\(((?!http)[^)]+)\)(?:\s*\))?').search
-        xref_pat = self.config['xref-link-pattern'] % '{slug}'
-        markdown_fields = self.config['markdown']
-
-        # Ideally these strings would live in some kind of configurable
-        # place, but time constraints make that a low-priority
-        xref_fmt_strings = {
-            'ar': f'([{{1}} :{{0}}]({xref_pat}) انظر)',
-            'en': f'(see: [{{0}}: {{1}}]({xref_pat}))',
-            'es': f'(ver: [{{0}}: {{1}}]({xref_pat}))',
-            'pt': f'(veja: [{{0}}: {{1}}]({xref_pat}))',
+        xref_format_strings = {
+            **{lang: '(see: [{type}: {title}](/tool/{slug})' for lang in language_all},
+            **{'link': '[{title}](/tool/{slug})'},
+            **self.config.get('xref-format-strings', {}),
         }
+        markdown_fields = self.config['markdown']
 
         # Get type names for each language (currently in the config as lang-named keys within types-modules)
         types = {lang: {T['one']: T.get(lang, T['one']) for T in self.config['types-modules']}
@@ -321,7 +316,7 @@ class ContentLoader(object):
                 # Module exists
                 if content:
                     if link_text:
-                        replacement = f'[{{}}]({xref_pat})'.format(link_text, slug=content['slug'])
+                        replacement = xref_format_strings['link'].format(title=link_text, slug=content['slug'])
                     else:
                         if language == language_default:
                             link_text = nest_parens(content['title'], 1)
@@ -332,7 +327,7 @@ class ContentLoader(object):
                             except KeyError:
                                 link_text = nest_parens(content['title'], 1)
                         type_name = types[language][content['type']].upper()
-                        replacement = xref_fmt_strings[language].format(type_name, link_text, slug=content['slug'])
+                        replacement = xref_format_strings[language].format(type=type_name, title=link_text, slug=content['slug'])
                     chunks.append(re.sub(re.escape(m.group()), replacement, text[:end]))
                 # No module, but there's link text
                 elif link_text:
@@ -493,7 +488,6 @@ class ContentLoader(object):
         c.setdefault('plural-keys', {})
         # Fields which should be parsed with markdown parser
         c.setdefault('markdown', [])
-        c.setdefault('xref-link-pattern', '/tool/%s')
         # Fields which should be indexed by client search engines
         c.setdefault('search', [])
         # Download top-level assets from this top-level folder to this (relative) local path
