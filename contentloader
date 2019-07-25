@@ -26,6 +26,7 @@ import jinja2
 import langdetect
 import requests
 from fuzzywuzzy.process import extractOne
+from icu import ListFormatter, Locale
 
 from utils import *
 from config import *
@@ -272,27 +273,17 @@ class ContentLoader(object):
         language_default = self.config['language-default']
 
         # Produce byline field for each language
-        language_joiners = {
-            'en': [', ', ' and '],
-            'es': [', ', ' y '],
-            'ar': [' \u0648 ', ' \u0648 '],
-            'pt': [',', ' e '],
-        }
-        content_by_slug = {c['slug']: c for c in all_content}
-        for content in all_content:
-            author_content = [content_by_slug[a] for a in content.get('authors', [])]
-            if author_content:
-                author_by_lang = {lang: [a['translations'].get(lang, {}).get('title', a['title']) for a in author_content]
-                                  for lang in language_all}
-                for lang, authors in author_by_lang.items():
-                    join_mid, join_last = language_joiners[lang]
-                    if len(authors) == 1:
-                        byline = authors[0]
-                    elif len(authors) == 2:
-                        byline = join_last.join(authors)
-                    else:
-                        byline = join_mid.join(authors[:-1]) + join_last + authors[-1]
+        list_formatters = {lang: ListFormatter.createInstance(Locale(lang)).format
+            for lang in language_all}
 
+        people_by_slug = {c['slug']: c for c in all_content if c['type'] == 'person'}
+        for content in all_content:
+            people_content = [people_by_slug[a] for a in content.get('authors', [])]
+            if people_content:
+                titles_by_lang = {lang: [p['translations'].get(lang, {}).get('title', p['title']) for p in people_content]
+                                  for lang in language_all}
+                for lang, titles in titles_by_lang.items():
+                    byline = list_formatters[lang](titles)
                     if lang == language_default:
                         content['byline'] = byline
                     elif lang in content['translations']:
