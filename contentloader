@@ -121,7 +121,6 @@ class ContentLoader(object):
 
         # Load content
         else:
-            #TODO: in production always unwatch/watch
             #TODO: handle document renaming/deletion
 
             if self.options.local:
@@ -180,7 +179,10 @@ class ContentLoader(object):
             self.generate_previews()
 
             if full_reload:
-                production = not (DEBUG or DEVELOP)
+                # TODO: Improve this heuristic so that casual development
+                #       doesn't lead to webhook registration for the
+                #       production server.
+                production = not (DEBUG or DEVELOP or self.options.local)
                 if production:
                     self.unwatch()
                 log(f'db: replacing database "{DB_NAME}"')
