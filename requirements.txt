@@ -1,5 +1,6 @@
 git+https://github.com/adrian-the-git/driveclient@master
-git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
+#git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
+git+https://github.com/adrian-the-git/archieml-python.git@f4f72139f58d5476324a42541f60a5d7b3e74e3e
 BeautifulSoup4
 couchdb
 flask
