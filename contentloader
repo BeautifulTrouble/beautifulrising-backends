@@ -140,7 +140,7 @@ class ContentLoader(object):
                 if self.options.save_local:
                     with script_directory():
                         with open(DRIVE_CACHE_FILE_NAME, 'w') as f:
-                            json.dump(published_documents, f, default=driveclient_document_json_encoder)
+                            json.dump(published_documents, f, indent=2, default=driveclient_document_json_encoder)
                             log('local: saved local cache of drive content', fatal=True)
 
             if not published_documents:
