@@ -32,6 +32,7 @@ from utils import *
 from config import *
 
 INTAKE_LIMIT = '10/minute'
+QUERY_LIMIT = 9999
 
 # App Setup
 # ////////////////////////////////////////////////////////////////////////////
@@ -367,19 +368,20 @@ types = {T['one']: T['many'] for T in config['types']}
 for singular_name,plural_name in types.items():
 
     class Many(Resource):
-        type = singular_name
-        query = "function(doc){if(doc.type=='%s'){emit(doc.slug,doc)}}" % singular_name
+        query = {'limit': QUERY_LIMIT,
+                 'selector': {'type': singular_name}}
         def get(self):
             try:
-                return filter_output([doc['value'] for doc in db.query(self.query)])
+                return filter_output([*db.find(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
     api.add_resource(Many, f'{API_PATH}/{plural_name}', endpoint=plural_name)
 
     class One(Resource):
-        type = singular_name
+        T = singular_name
         def get(self, id):
             try:
-                return filter_output(db[f'{self.type}:{id}'])
+                # XXX: FYI here is a dependency on exact db key names
+                return filter_output(db[f'{self.T}:{id}'])
             except ResourceNotFound: raise NotFound
     api.add_resource(One, f'{API_PATH}/{singular_name}/<id>', endpoint=singular_name)
 
@@ -389,21 +391,20 @@ groups = {k.split('-',1)[-1]:[d['one'] for d in v] for k,v in config.items() if 
 for group,types in groups.items():
 
     class Group(Resource):
-        types = types
-        query = "function(doc){if(%s.indexOf(doc.type)!=-1){emit(doc.slug,doc)}}" % json.dumps(types)
+        query = {'limit': QUERY_LIMIT,
+                 'selector': {'$or': [{'type': T} for T in types]}}
         def get(self):
             try:
-                return filter_output([doc['value'] for doc in db.query(self.query)])
+                return filter_output([*db.find(self.query)])
             except (KeyError, ResourceNotFound): raise NotFound
     api.add_resource(Group, f'{API_PATH}/{group}', endpoint=group)
 
 
 # Just emit all the documents
 class All(Resource):
-    query = "function(doc){emit(doc.slug,doc)}"
     def get(self):
         try:
-            return filter_output([doc['value'] for doc in db.query(self.query)])
+            return filter_output([row['doc'] for row in db.view('_all_docs', include_docs=True)])
         except (KeyError, ResourceNotFound): raise NotFound
 api.add_resource(All, f'{API_PATH}/all', endpoint='all')
 
