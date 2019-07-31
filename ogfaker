@@ -130,10 +130,20 @@ def get_title_tagline_image(content):
     return plucks(ui, 'misc.site-title'), promo.get('tagline', ''), promo.get('image', '')
 
 
-def by_slug(content, slug):
-    for item in content:
-        if item.get('slug') == slug:
-            return item
+def by_slug(content, slug, tools_only=False):
+    if tools_only:
+        types = []
+        for c in content:
+            if c.get('type') == 'config' and c.get('slug') == 'api':
+                types = [T.get('one') for T in c.get('types-modules', [])]
+                break
+        for c in content:
+            if c.get('type') in types and c.get('slug') == slug:
+                return c
+    else:
+        for c in content:
+            if c.get('slug') == slug:
+                return c
     return {}
 
 
@@ -160,7 +170,7 @@ def fake_any(lang='', path=''):
 @app.route(PREFIX + '<string(length=2):lang>/tool/<slug>', methods=['GET'])
 def fake_tool(lang='', slug=''):
     content = get_cache(lang)
-    tool = by_slug(content, slug)
+    tool = by_slug(content, slug, tools_only=True)
 
     site_title, tagline, image = get_title_tagline_image(content)
     image = tool.get('image', image)
