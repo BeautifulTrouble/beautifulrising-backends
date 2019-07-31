@@ -7,6 +7,7 @@ autovenv.run()
 import asyncio
 import json
 import os
+import shlex
 import subprocess
 import sys
 
@@ -15,12 +16,15 @@ import pyppeteer
 import requests
 from bs4 import BeautifulSoup
 
-
 from utils import (
     die,
     log,
     warn,
 )
+from config import (
+    PUPPETEER_ARGS,
+)
+
 
 
 CAN_OVERWRITE = [
@@ -59,7 +63,9 @@ def download_og_image(url, output_path):
 
 async def main(urls_and_outputs):
     log('pyppeteer: starting up...')
-    browser = await pyppeteer.launch()
+
+    args = shlex.split(PUPPETEER_ARGS)
+    browser = await pyppeteer.launch(args=args)
 
     for url, output_path in urls_and_outputs.items():
         if os.path.isfile(output_path):
@@ -80,7 +86,7 @@ async def main(urls_and_outputs):
                 warn(f'pyppeteer: {e} ({url})')
             except ConnectionError:
                 await browser.close()
-                browser = await pyppeteer.launch()
+                browser = await pyppeteer.launch(args=args)
 
     log('preview: finished')
     await browser.close()
