@@ -17,13 +17,13 @@ from jinja2 import Template
 from plucky import plucks
 
 from utils import (
-    DEBUG,
     log,
     script_directory,
 )
 from config import (
     API_SERVER,
     API_PATH,
+    DEBUG,
     FB_APP_ID,
 )
 
