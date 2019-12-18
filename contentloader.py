@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-#encoding: utf-8
-
-# Auto-install and activate a virtualenv if possible
-import autovenv
-autovenv.run()
 
 import argparse
 import json
@@ -900,9 +894,4 @@ class ContentLoader(object):
                         log(f'convert: asset "{file.title}"')
                         for prefix,args in self.config['asset-manipulation'].items():
                             Popen(['convert', *shlex.split(args), file.title, f'{prefix}-{file.title}'])
-
-
-if __name__ == '__main__':
-    with only_one_process(DB_NAME):
-        ContentLoader()
 

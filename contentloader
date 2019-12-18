@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+
+# Auto-install and activate a virtualenv if possible
+import autovenv
+autovenv.run()
+
+import contextlib
+import fcntl
+import inspect
+import os
+
+from config import DB_NAME
+
+
+@contextlib.contextmanager
+def process_lock(name=None):
+    '''
+    Use a file lock to ensure only one process runs at a time
+    '''
+    caller = inspect.getouterframes(inspect.currentframe())[2]
+    caller_dir = os.path.dirname(os.path.realpath(caller.filename))
+    if not name:
+        name = os.path.splitext(os.path.basename(caller.filename))
+    with open(os.path.join(caller_dir, f'{name}.lock'), 'w') as f:
+        try:
+            fcntl.lockf(f, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.lockf(f, fcntl.LOCK_UN)
+
+
+with process_lock(DB_NAME):
+    import contentloader
+    contentloader.ContentLoader()
+
