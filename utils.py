@@ -18,8 +18,6 @@ import unidecode
 import driveclient
 
 
-DEBUG = '--debug' in sys.argv
-DEVELOP = '--develop' in sys.argv
 
 
 # Regex word boundaries don't work with Arabic characters, so any regex which
@@ -248,8 +246,6 @@ def die(*s):
 
 
 __all__ = [
-    'DEBUG',
-    'DEVELOP',
     'ARABIC_BOUNDARY_REGEX',
     'PhonyDriveFileWithText',
     'driveclient_document_json_encoder',

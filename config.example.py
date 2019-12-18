@@ -28,7 +28,12 @@ RECAPTCHA_V2_SITE_SECRET = 'SECRET'
 RECAPTCHA_INVISIBLE_SITE_KEY = 'KEY'
 RECAPTCHA_INVISIBLE_SITE_SECRET = 'SECRET'
 
-from utils import DEVELOP
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+import sys
+DEBUG = '--debug' in sys.argv
+DEVELOP = '--develop' in sys.argv
+
 if DEVELOP:
     DB_NAME = DB_NAME + '_develop'
 
