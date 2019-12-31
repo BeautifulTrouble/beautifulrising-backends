@@ -365,39 +365,41 @@ def add_cors_headers(response):
 
 # Get content types and create endpoints
 types = {T['one']: T['many'] for T in config['types']}
-for singular_name,plural_name in types.items():
-
-    class Many(Resource):
-        query = {'limit': QUERY_LIMIT,
-                 'selector': {'type': singular_name}}
-        def get(self):
-            try:
-                return filter_output([*db.find(self.query)])
-            except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Many, f'{API_PATH}/{plural_name}', endpoint=plural_name)
-
-    class One(Resource):
+for singular_name, plural_name in types.items():
+    class Type(Resource):
         T = singular_name
-        def get(self, id):
+        def get(self, slug=None):
             try:
-                # XXX: FYI here is a dependency on exact db key names
-                return filter_output(db[f'{self.T}:{id}'])
-            except ResourceNotFound: raise NotFound
-    api.add_resource(One, f'{API_PATH}/{singular_name}/<id>', endpoint=singular_name)
+                if slug:
+                    query = {'limit': 1, 'selector': {'type': self.T, 'slug': slug}}
+                    result = [*db.find(query)][0]
+                else:
+                    query = {'limit': QUERY_LIMIT, 'selector': {'type': self.T}}
+                    result = [*db.find(query)]
+                return filter_output(result)
+            except (KeyError, IndexError, ResourceNotFound): raise NotFound
+    api.add_resource(Type, f'{API_PATH}/{singular_name}/', endpoint=singular_name)
+    api.add_resource(Type, f'{API_PATH}/{singular_name}/<slug>', endpoint=f'{singular_name}/slug')
+    api.add_resource(Type, f'{API_PATH}/{plural_name}/', endpoint=f'{plural_name} (DEPRECATED, use: {API_PATH}/{singular_name}/)')
 
 
 # Get the grouped types and create endpoints
-groups = {k.split('-',1)[-1]:[d['one'] for d in v] for k,v in config.items() if k.startswith('types-')}
-for group,types in groups.items():
-
+groups = {k.split('-',1)[-1]: [d['one'] for d in v] for k, v in config.items() if k.startswith('types-')}
+for group, types in groups.items():
     class Group(Resource):
-        query = {'limit': QUERY_LIMIT,
-                 'selector': {'$or': [{'type': T} for T in types]}}
-        def get(self):
+        T_select_or = {'$or': [{'type': T} for T in types]}
+        def get(self, slug=None):
             try:
-                return filter_output([*db.find(self.query)])
-            except (KeyError, ResourceNotFound): raise NotFound
-    api.add_resource(Group, f'{API_PATH}/{group}', endpoint=group)
+                if slug:
+                    query = {'limit': 1, 'selector': {'$and': [self.T_select_or, {'slug': slug}]}}
+                    result = [*db.find(query)][0]
+                else:
+                    query = {'limit': QUERY_LIMIT, 'selector': self.T_select_or}
+                    result = [*db.find(query)]
+                return filter_output(result)
+            except (KeyError, IndexError, ResourceNotFound): raise NotFound
+    api.add_resource(Group, f'{API_PATH}/{group}/', endpoint=group)
+    api.add_resource(Group, f'{API_PATH}/{group}/<slug>', endpoint=f'{group}/slug')
 
 
 # Just emit all the documents
@@ -406,7 +408,7 @@ class All(Resource):
         try:
             return filter_output([row['doc'] for row in db.view('_all_docs', include_docs=True)])
         except (KeyError, ResourceNotFound): raise NotFound
-api.add_resource(All, f'{API_PATH}/all', endpoint='all')
+api.add_resource(All, f'{API_PATH}/all/', endpoint='all')
 
 
 # Expose the config for front-ends
