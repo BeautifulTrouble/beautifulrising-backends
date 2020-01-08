@@ -210,7 +210,7 @@ def intake(feature):
 # ////////////////////////////////////////////////////////////////////////////
 
 # Used for setting module-type
-module_types = [t['one'] for t in config['types-modules']]
+module_types = [t['one'] for t in config['types-tool']]
 
 # Clean strings of punctuation for better ordering
 punctuation_table = str.maketrans('', '', string.punctuation + '¿¡‘’“”')
