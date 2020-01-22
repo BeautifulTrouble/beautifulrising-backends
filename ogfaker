@@ -135,7 +135,7 @@ def by_slug(content, slug, tools_only=False):
         types = []
         for c in content:
             if c.get('type') == 'config' and c.get('slug') == 'api':
-                types = [T.get('one') for T in c.get('types-modules', [])]
+                types = [T.get('one') for T in c.get('types-tool', [])]
                 break
         for c in content:
             if c.get('type') in types and c.get('slug') == slug:

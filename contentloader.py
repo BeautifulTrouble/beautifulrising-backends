@@ -203,8 +203,8 @@ class ContentLoader(object):
 
         language_default = self.config['language-default']
 
-        module_types = [t['one'] for t in self.config['types-modules']]
-        module_types_plural = [t['many'] for t in self.config['types-modules']]
+        module_types = [t['one'] for t in self.config['types-tool']]
+        module_types_plural = [t['many'] for t in self.config['types-tool']]
 
         for content in all_content:
             if NEW in content:
@@ -299,8 +299,8 @@ class ContentLoader(object):
         }
         markdown_fields = self.config['markdown']
 
-        # Get type names for each language (currently in the config as lang-named keys within types-modules)
-        types = {lang: {T['one']: T.get(lang, T['one']) for T in self.config['types-modules']}
+        # Get type names for each language (currently in the config as lang-named keys within types-tool)
+        types = {lang: {T['one']: T.get(lang, T['one']) for T in self.config['types-tool']}
                  for lang in language_all}
 
         def patch_links(text):

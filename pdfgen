@@ -186,7 +186,7 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
                            for k, v in plucks(c['texts'], 'tags.all').items()}
 
         # Preprocess the modules for easier use in template rendering
-        module_types = [t['one'] for t in config['types-modules']]
+        module_types = [t['one'] for t in config['types-tool']]
         modules = c['modules'] = {o.get('slug'): o for o in content if o.get('type') in module_types}
         titles = c['titles'] = {k: v.get('title') for k,v in c['modules'].items()}
 
