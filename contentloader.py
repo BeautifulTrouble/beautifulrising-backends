@@ -392,9 +392,6 @@ class ContentLoader(object):
         '''
         General-purpose fuzzy matcher
         '''
-        if not title_list:
-            return
-
         match = extractOne(title, title_list)
         if match and match[1] >= thresh:
             return match[0]
@@ -408,7 +405,7 @@ class ContentLoader(object):
         XXX: If item_list has changed since the last time it was cached, this function
              can return an item which is no longer in item_list. A source of strange bugs.
         '''
-        if not isinstance(item_name, str) or not item_list:
+        if not isinstance(item_name, str):
             return {}
 
         cached = fuzzy_match_cache.setdefault((id(item_list), len(item_list)), {}).get(item_name)
@@ -417,16 +414,15 @@ class ContentLoader(object):
 
         # First determine whether the item_name refers to a module which has been renamed
         renamed = self.config['renamed-modules']
-        if renamed:
-            match = extractOne(item_name, renamed.keys())
-            if match and match[1] >= 90:
-                if item_name not in rename_cache:
-                    rename_cache.add(item_name)
-                    log(f'renamed: reference changed from "{item_name}" to "{renamed[match[0]]}"')
-                item_name = renamed[match[0]]
+        match = extractOne(item_name, renamed.keys())
+        if match and match[1] >= 90:
+            if item_name not in rename_cache:
+                rename_cache.add(item_name)
+                log(f'renamed: reference changed from "{item_name}" to "{renamed[match[0]]}"')
+            item_name = renamed[match[0]]
 
         # Perform the actual match
-        match = extractOne(item_name, item_list, processor=lambda m: m.get('title', ''))
+        match = extractOne({'title': item_name}, item_list, processor=lambda i: i.get('title', ''))
         if match and match[1] >= thresh:
             fuzzy_match_cache[id(item_list), len(item_list)][item_name] = match[0]
             return match[0]
