@@ -126,6 +126,7 @@ def markdown(s, p=True, *, cache={}):
     #if s in cache:
     #    return cache[s]
 
+    s = re.sub(r'([^\n])\n([^\n])', r'\1\n\n\2', s)
     html = markdown_(s, output_format='html5', extensions=['markdown.extensions.footnotes'])
     soup = BeautifulSoup(html, 'html.parser')
 
