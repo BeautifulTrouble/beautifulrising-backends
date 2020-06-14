@@ -299,7 +299,7 @@ def filter_output(resources):
         # but may be effectively a lesser type when portions are missing from translation.
         if resource['type'] in module_types:
             module_type = module_type_effective = resource['module-type']
-            document_title = resource['document_title']
+            #document_title = resource['document_title']
             # We have to be sure not to promote a piece to gallery if it's meant to be a
             # snapshot but has a full-write-up in language_default and possibly has
             # 'full-write-up' in lang_missing. Team ed. wants the filename to set the type.
@@ -402,6 +402,17 @@ for group, types in groups.items():
     api.add_resource(Group, f'{API_PATH}/{group}/<slug>', endpoint=f'{group}/slug')
 
 
+# Pragmatic tools + people endpoint for BT2020 website
+class Content(Resource):
+    web_content_types = [t['one'] for t in config['types-tool']] + ['person']
+    T_select_or = {'$or': [{'type': T} for T in web_content_types]}
+    def get(self, slug=None):
+        try:
+            return filter_output([*db.find({'limit': QUERY_LIMIT, 'selector': self.T_select_or})])
+        except (KeyError, IndexError, ResourceNotFound): raise NotFound
+api.add_resource(Content, f'{API_PATH}/content/', endpoint='content')
+
+
 # Just emit all the documents
 class All(Resource):
     def get(self):
@@ -425,7 +436,7 @@ class Endpoints(Resource):
                 'url': unquote(url_for(rule.endpoint, **{a: f'<{a}>' for a in rule.arguments})),
                 'methods': list(rule.methods),
             } for rule in app.url_map.iter_rules()}
-api.add_resource(Endpoints, f'{API_PATH}')
+api.add_resource(Endpoints, f'{API_PATH}/')
 
 
 # Run when invoked from the command line
