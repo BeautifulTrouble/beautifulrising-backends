@@ -252,6 +252,7 @@ class ContentLoader(object):
                     key_name = 'key-' + module_type
                     if key_name in content:
                         content['key-modules'][key_name] = [result[0] for result in (key_finder(k) for k in content[key_name]) if result]
+                        del content[key_name]
                 if not content['key-modules']:
                     del content['key-modules']
 
