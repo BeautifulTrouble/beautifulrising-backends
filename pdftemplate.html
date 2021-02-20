@@ -213,7 +213,7 @@
         <div class="hr"></div>
         {% if module.get('pull-quote') %}
         <div class="pull-quote">
-            <h1>&ldquo;{{ module['pull-quote'] }}&rdquo;</h1>
+            <h1>&ldquo;{{ markdown(module['pull-quote'], p=False) }}&rdquo;</h1>
         </div>
         {% endif %}
         <div class="content-wrapper">
