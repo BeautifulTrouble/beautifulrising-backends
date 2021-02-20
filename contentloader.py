@@ -356,6 +356,8 @@ class ContentLoader(object):
         titles = slugs_by_title.keys()
 
         # This final pass through all nested content patches up xrefs and key-modules
+        tool_by_slug = {c['slug']: c for c in all_content}
+
         for content in all_content:
             language = content['lang']
             # Add slugs to key-modules
@@ -376,7 +378,10 @@ class ContentLoader(object):
                 if 'key-modules' in c:
                     for key_group in c['key-modules'].values():
                         for i, k in enumerate(key_group):
-                            key_group[i] = list(k[:2]) + [slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')]
+                            # Replace english key module title with translated title if possible
+                            slug = slugs_by_title.get(self.find_fuzzy(k[0], titles, thresh=90), '')
+                            if slug:
+                                key_group[i] = [tool_by_slug[slug]['translations'].get(language, {'title': k[0]})['title'], k[1], slug]
                 # Process xref links in markdown fields
                 if NEW in c and language in language_all:
                     for field in self.config['markdown']:
