@@ -137,7 +137,7 @@ def parse_archieml(text):
     text = re.sub(r'^\[[a-z]\].+$', '', text, flags=re.M)
     text = re.sub(r'\[[a-z]\]', '', text)
     # Undo some of the auto-capitalization google docs inflicts
-    return {k.lower(): v for k,v in archieml.loads(text).items() if v}
+    return {k.lower(): v for k,v in archieml.loads(text).items() if v and isinstance(v, str)}
 
 
 def google_doc_id(string):
