@@ -65,6 +65,13 @@ config = CouchDocumentAccessor('config:api')
 # Google administrative mumbo jumbo
 # ////////////////////////////////////////////////////////////////////////////
 
+@app.route('/robots.txt')
+def robots():
+    '''
+    Make sure google feels comfortable
+    '''
+    return 'User-agent: *\nDisallow:'
+
 @app.route('/' + GOOGLE_VERIFICATION)
 def google_verification():
     '''
