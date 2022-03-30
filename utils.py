@@ -1,3 +1,4 @@
+# fmt: off
 
 import atexit
 import contextlib
@@ -13,6 +14,7 @@ from functools import reduce, wraps
 from subprocess import Popen
 
 import archieml
+archieml.OrderedDict = dict
 import magic
 import unidecode
 import driveclient

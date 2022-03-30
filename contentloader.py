@@ -1,3 +1,4 @@
+# fmt: off
 
 import argparse
 import json
@@ -343,7 +344,7 @@ class ContentLoader(object):
             dict:   lambda d: {k: visit_all(v) for k,v in d.items()},
             str:    lambda s: patch_links(s),
             int:    lambda i: i,
-        }[dict if isinstance(x, dict) else type(x)](x)
+        }[type(x)](x)
 
 
         # Create a mapping of titles to slugs
@@ -667,7 +668,7 @@ class ContentLoader(object):
             list:   lambda L: '\n'.join(map(r_concat, L)),
             dict:   lambda d: '\n'.join(map(r_concat, d.values())),
             str:    lambda s: '' if an_obvious_computer_thing(s) else s
-        }.get(dict if isinstance(x, dict) else type(x), str)(x)
+        }.get(type(x), str)(x)
 
         for content in all_content:
             if 'lang' not in content:
