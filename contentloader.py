@@ -1,6 +1,7 @@
 # fmt: off
 
 import argparse
+import concurrent.futures
 import json
 import math
 import os
@@ -131,6 +132,11 @@ class ContentLoader(object):
                 # Identify published documents by their filenames and fetch new content
                 published = re.compile(self.config['published-filename-regex']).search
                 published_documents = [d for d in self.get_documents() if published(d.title) or d.id in self.options.ids]
+
+                # Eagerly download in multiple threads (segfaults!)
+                # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+                #     published_documents = executor.map(
+                #         lambda d: PhonyDriveFileWithText(d.client, {**d.attributes, '__text': d.text}), published_documents)
 
                 if self.options.save_local:
                     with script_directory():
