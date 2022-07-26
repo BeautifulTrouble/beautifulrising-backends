@@ -39,7 +39,7 @@ def send_mail(to, subject, text):
     try:
         r = requests.post('https://api.mailgun.net/v3/beautifulrising.org/messages',
             auth=('api', MAILGUN_API_KEY),
-            data={'from': 'Beautiful Rising Web <noreply@beautifulrising.org>',
+            data={'from': 'Beautiful Trouble Web <noreply@beautifultrouble.org>',
                 'to': to, 'subject': subject, 'text': text})
     except requests.RequestException: r = None
     return r
@@ -90,7 +90,7 @@ def add_to_doc(doc_name, dct):
         <h1>{{ title }}</h1>
         <p class="disclaimer">
             <strong>DO NOT MODIFY THIS DOCUMENT</strong>.
-            It was produced automatically on %s by the beautifulrising.org
+            It was produced automatically on %s by the beautifultrouble.org
             website or one of its services.
         </p>
         <p>&nbsp;</p>

@@ -37,7 +37,7 @@ from config import (
     MAILGUN_API_KEY, 
 )
 
-ABSOLUTE_URL_PREFIX = 'https://beautifulrising.org'
+ABSOLUTE_URL_PREFIX = 'https://beautifultrouble.org'
 RELATIVE_URL_REGEX = re.compile('^/tool/.+')
 TAG_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tag/%s')
 TOOL_URL = urljoin(ABSOLUTE_URL_PREFIX, '/tool/%s')
@@ -56,11 +56,11 @@ config = requests.get(f'{API_SERVER}{API_PATH}/config').json()
 # A language-keyed dict of dicts containing text for outgoing emails
 # Since this is fetched once at server launch, updates require a restart
 email_text = {lang: {
-        'from_': f'{plucks(text, "email.from")} <noreply@beautifulrising.org>',
+        'from_': f'{plucks(text, "email.from")} <noreply@beautifultrouble.org>',
         'subject': plucks(text, 'email.subject'),
         'message': plucks(text, 'email.message'),
         # Mailgun has issues with non-ascii filenames
-        'filename': 'beautifulrising.pdf'
+        'filename': 'BeautifulTrouble.pdf'
     } for lang, text in {lang: requests.get(f'{API_SERVER}{API_PATH}/text/pdf?lang={lang}').json()
                          for lang in config['language-all']}.items()}
 
@@ -352,7 +352,7 @@ def pdf(request_type):
 
         elif request_type == 'download':
             pdf = make_pdf(modules, lang, size, unique_hash)
-            headers = {'Content-Disposition': f'attachment; filename="beautifulrising-{unique_hash[:5]}.pdf"'} if download else {}
+            headers = {'Content-Disposition': f'attachment; filename="BeautifulTrouble-{unique_hash[:5]}.pdf"'} if download else {}
             return Response(pdf, mimetype='application/pdf', headers=headers)
 
     raise BadRequest
