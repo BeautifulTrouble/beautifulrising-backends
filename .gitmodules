@@ -1,0 +1,3 @@
+[submodule "api2json"]
+	path = api2json
+	url = ssh://git@github.com/BeautifulTrouble/api2json.git

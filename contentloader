@@ -8,8 +8,13 @@ import contextlib
 import fcntl
 import inspect
 import os
+import subprocess
 
-from config import DB_NAME
+from config import (
+    DB_NAME,
+    JOBS_PRE,
+    JOBS_POST,
+)
 
 
 @contextlib.contextmanager
@@ -29,7 +34,13 @@ def process_lock(name=None):
             fcntl.lockf(f, fcntl.LOCK_UN)
 
 
+for shell_command in JOBS_PRE:
+    subprocess.Popen(shell_command, shell=True)
+
 with process_lock(DB_NAME):
     import contentloader
     contentloader.ContentLoader()
+
+for shell_command in JOBS_POST:
+    subprocess.Popen(shell_command, shell=True)
 
