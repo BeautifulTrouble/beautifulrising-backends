@@ -35,12 +35,12 @@ def process_lock(name=None):
 
 
 for shell_command in JOBS_PRE:
-    subprocess.Popen(shell_command, shell=True)
+    subprocess.Popen(shell_command, shell=True).wait()
 
 with process_lock(DB_NAME):
     import contentloader
     contentloader.ContentLoader()
 
 for shell_command in JOBS_POST:
-    subprocess.Popen(shell_command, shell=True)
+    subprocess.Popen(shell_command, shell=True).wait()
 
