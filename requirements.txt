@@ -6,7 +6,6 @@ couchdb
 fasttext-langdetect
 flask
 flask-restful
-flask-compress
 flask-limiter
 fuzzywuzzy>=0.18.0
 jinja2
@@ -21,7 +20,6 @@ requests
 selenium
 unidecode
 validators
-cerberus
 pyicu
 oauth2client
 google-api-python-client==1.7.4
