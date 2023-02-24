@@ -4,24 +4,14 @@
 import autovenv
 autovenv.run()
 
-import json
-import os
-import pprint
-import random
-import re
 import string
-import sys
-import time
 from functools import cmp_to_key
-from operator import attrgetter, itemgetter
 from urllib.parse import urlparse, unquote
 
 import couchdb
 import requests
-from cerberus import Validator
 from couchdb.http import ResourceNotFound
 from flask import Flask, Response, request, url_for
-from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_restful import Resource, Api
@@ -31,7 +21,6 @@ from werkzeug.exceptions import NotFound, Forbidden
 from utils import *
 from config import *
 
-INTAKE_LIMIT = '10/minute'
 QUERY_LIMIT = 9999
 
 # App Setup
@@ -39,7 +28,6 @@ QUERY_LIMIT = 9999
 
 app = Flask(__name__)
 api = Api(app)
-Compress(app)
 limiter = Limiter(app, key_func=get_remote_address)
 
 
@@ -128,89 +116,6 @@ def notify():
                 venv_run("contentloader", "--id", doc_id)
 
     return '', 204
-
-
-# Intake
-# ////////////////////////////////////////////////////////////////////////////
-
-def recaptcha_is_valid(recaptcha_response, recaptcha_version, *, timeout=4):
-    '''
-    Validate a recaptcha from form data. Always returns True if DEBUG is True.
-    '''
-    if DEBUG:
-        return True
-
-    if recaptcha_version == 'v2':
-        log('recaptcha: v2')
-        secret = RECAPTCHA_V2_SITE_SECRET
-    else:
-        log('recaptcha: invisible')
-        secret = RECAPTCHA_INVISIBLE_SITE_SECRET
-
-    try:
-        return requests.post('https://www.google.com/recaptcha/api/siteverify', timeout=timeout, data={
-            'secret': secret,
-            'response': recaptcha_response,
-            'remoteip': request.remote_addr,
-        }).json().get('success')
-    except requests.RequestException: pass
-
-
-@app.route('/intake/<feature>', methods=['POST'])
-@limiter.limit(INTAKE_LIMIT)
-def intake(feature):
-    feature_requirements = {
-        'contributor-question': Validator({'body': {'type': 'dict', 'schema':
-            {
-                'contributors':     {'type': 'list', 'schema': {'type': 'string', 'empty': False}},
-                'email':            {'type': 'string', 'required': True},
-                'question':         {'type': 'string', 'required': True, 'empty': False},
-            }
-        }}),
-        'real-world-examples': Validator({'body': {'type': 'dict', 'anyof_schema':
-            [{
-                'document_title':   {'type': 'string', 'required': True, 'empty': False},
-                'document_link':    {'type': 'string', 'required': True, 'empty': False},
-                'title':            {'type': 'string', 'required': True},
-                'link':             {'type': 'string', 'required': True, 'empty': False},
-                'description':      {'type': 'string', 'required': True},
-            }, {
-                'document_title':   {'type': 'string', 'required': True, 'empty': False},
-                'document_link':    {'type': 'string', 'required': True, 'empty': False},
-                'title':            {'type': 'string', 'required': True},
-                'link':             {'type': 'string', 'required': True},
-                'description':      {'type': 'string', 'required': True, 'empty': False},
-            }]
-        }}),
-        'newsfeed-suggestion': Validator({'body': {'type': 'dict', 'schema':
-            {
-                'suggestion':   {'type': 'string', 'required': True, 'empty': False},
-            }
-        }}),
-        'resource-suggestion': Validator({'body': {'type': 'dict', 'anyof_schema':
-            [{
-                'title':        {'type': 'string', 'required': True},
-                'link':         {'type': 'string', 'required': True, 'empty': False},
-                'description':  {'type': 'string', 'required': True},
-            }, {
-                'title':        {'type': 'string', 'required': True},
-                'link':         {'type': 'string', 'required': True},
-                'description':  {'type': 'string', 'required': True, 'empty': False},
-            }]
-        }}),
-    }
-    body = request.get_json()
-    validator = feature_requirements.get(feature)
-    if not body:
-        return 'Validation Failed. Please provide application/json in the body of the request.', 400
-    if not validator:
-        return 'No such intake endpoint', 404
-    if recaptcha_is_valid(body.pop('g-recaptcha-response', None), body.pop('g-recaptcha-version', None)):
-        if validator.validate({'body': body}):
-            venv_run('intakehandler', feature, json.dumps(body))
-            return '', 204
-    schema = pprint.pformat(dict(validator.schema))
-    return f'Validation Failed. Use reCAPTCHA and the following schema:\n{schema}', 400
 
 
 # Output filtering
