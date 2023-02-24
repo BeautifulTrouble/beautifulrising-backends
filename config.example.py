@@ -19,6 +19,9 @@ FB_APP_ID = 'APP ID'
 
 GOOGLE_VERIFICATION = 'googleabc123.html'
 
+JOBS_PRE = []
+JOBS_POST = []
+
 MAILGUN_API_KEY = 'TOKEN'
 
 PUPPETEER_ARGS = '--no-sandbox'
