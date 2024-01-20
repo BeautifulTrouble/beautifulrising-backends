@@ -493,7 +493,9 @@ class ContentLoader(object):
         c.setdefault('language-omit', [])
         c.setdefault('language-detection-weighted-keys', [])
         # How we distinguish published content
-        c.setdefault('published-filename-regex', r'(?i)\bdone$')
+        c.setdefault('published-filename-regex', r'\bDONE\b')
+        # Ignore folders
+        c.setdefault('ignore-folder-regex', r'^$')
         # Renaming synonymous keys, including those with language-suffixes
         c.setdefault('synonyms', {})
         # Manage single keys which contain lists
@@ -589,6 +591,9 @@ class ContentLoader(object):
             # Recursive folder getter requires python3.3+ for "yield from"
             def get_folders(root):
                 for folder in root.folders:
+                    if re.search(self.config['ignore-folder-regex'], folder.title):
+                        log(f'omit: by ignore-folder-regex "{folder.title}"')
+                        continue
                     yield folder
                     yield from get_folders(folder)
             for folder in get_folders(self.root):
