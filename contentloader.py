@@ -24,6 +24,10 @@ import requests
 from fuzzywuzzy.process import extractOne
 from icu import ListFormatter, Locale
 
+# Kludge to fix broken google-api-python-client
+from oauth2client import file
+
+
 from utils import *
 from config import *
 
