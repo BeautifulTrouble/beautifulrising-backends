@@ -54,17 +54,16 @@ config = requests.get(f'{API_SERVER}{API_PATH}/config').json()
 
 
 # A language-keyed dict of dicts containing text for outgoing emails
-# Since this is fetched once at server launch, updates require a restart
-email_text = {lang: {
-        'from_': f'{plucks(text, "email.from")} <noreply@beautifultrouble.org>',
-        'subject': plucks(text, 'email.subject'),
-        'message': plucks(text, 'email.message'),
+email_text = {
+    lang: {
+        "from_": "Beautiful Trouble <noreply@beautifultrouble.org>",
+        "subject": "Custom PDF of Beautiful Trouble Tools",
+        "message": "As requested, your custom PDF of Beautiful Trouble Tools",
         # Mailgun has issues with non-ascii filenames
-        'filename': 'BeautifulTrouble.pdf'
-    } for lang, text in {lang: requests.get(f'{API_SERVER}{API_PATH}/text/pdf?lang={lang}').json()
-                         for lang in config['language-all']}.items()}
-
-
+        "filename": "BeautifulTrouble.pdf",
+    }
+    for lang in config["language-all"]
+}
 
 
 def phantom_init():
