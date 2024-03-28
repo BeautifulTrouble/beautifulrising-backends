@@ -10,6 +10,8 @@ import inspect
 import os
 import subprocess
 
+from utils import script_directory
+
 from config import (
     DB_NAME,
     JOBS_PRE,
@@ -34,13 +36,14 @@ def process_lock(name=None):
             fcntl.lockf(f, fcntl.LOCK_UN)
 
 
-for shell_command in JOBS_PRE:
-    subprocess.run(shell_command, shell=True)
+with script_directory():
+    for shell_command in JOBS_PRE:
+        subprocess.run(shell_command, shell=True)
 
-with process_lock(DB_NAME):
-    import contentloader
-    contentloader.ContentLoader()
+    with process_lock(DB_NAME):
+        import contentloader
+        contentloader.ContentLoader()
 
-for shell_command in JOBS_POST:
-    subprocess.run(shell_command, shell=True)
+    for shell_command in JOBS_POST:
+        subprocess.run(shell_command, shell=True)
 
