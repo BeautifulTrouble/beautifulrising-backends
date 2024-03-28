@@ -54,7 +54,7 @@ else:
     import subprocess
     import venv
 
-    def run(venv_name="venv", requirements_file="requirements.txt"):
+    def run(venv_name="env", requirements_file="requirements.txt"):
         # Detect flags intended for autovenv and remove them from sys.argv
         flags = "--no-autovenv --remove-venv"
         flags = {
