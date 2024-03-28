@@ -3,10 +3,13 @@
 #   pip install --upgrade pip
 # Then use GCC12 like so:
 #   CC=gcc-12 pip install -r requirements.2024.txt
+# It may be necessary to manually remove the pycrypto package
+#   pip uninstall pycrypto
 
 git+https://github.com/adrian-the-git/driveclient@master
 #git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
 git+https://github.com/adrian-the-git/archieml-python.git@f4f72139f58d5476324a42541f60a5d7b3e74e3e
+cryptography
 beautifulsoup4==4.8.2
 CouchDB==1.2
 flask
@@ -27,7 +30,6 @@ selenium
 unidecode
 validators
 pyicu
-cryptography
 oauth2client
 google-api-python-client
 pyppeteer
