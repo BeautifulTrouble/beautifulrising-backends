@@ -4,5 +4,5 @@ Description=Request push notifications about Google Drive content changes for co
 [Service]
 Type=oneshot
 ExecStart=/home/bt/beautifulrising-backends/env/bin/python /home/bt/beautifulrising-backends/contentloader --watch-docs
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
