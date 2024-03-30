@@ -248,7 +248,8 @@ def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}):
 
     phantom_init()
 
-    embed_fonts = True
+    # TODO: investigate the phantomjs font rendering issues
+    embed_fonts = False
     type_order = [config['plural-name-for-type'][t] for t in TYPE_ORDER]
     modules, people, text = get_modules_people_and_text(modules, lang)
     log(f'pdfgen: generating pdf of {len(modules)} module(s)')
