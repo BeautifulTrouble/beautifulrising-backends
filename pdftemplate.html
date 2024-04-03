@@ -6,23 +6,25 @@
         {% if lang == 'ar' %}
         @font-face {
             font-family: 'Kaff';
-            font-weight: normal;
-            src: url('/pdffonts/Kaff-Regular.WOFF');
+            font-weight: 400;
+            //src: url('/pdffonts/KaffRegular.ttf');
+            src: url('https://assets.beautifultrouble.org/KaffRegular.ttf');
         }
         @font-face {
             font-family: 'Kaff';
-            font-weight: bold;
-            src: url('/pdffonts/Kaff-Bold.WOFF');
+            font-weight: 700;
+            //src: url('/pdffonts/KaffBold.ttf');
+            src: url('https://assets.beautifultrouble.org/KaffBold.ttf');
         }
         {% endif %}
         @font-face {
             font-family: 'Avenir';
-            font-weight: normal;
+            font-weight: 400;
             src: url('/pdffonts/Avenir-Book.ttf');
         }
         @font-face {
             font-family: 'Avenir';
-            font-weight: bold;
+            font-weight: 700;
             src: url('/pdffonts/Avenir-Black.ttf');
         }
         html {
@@ -48,13 +50,13 @@
             font-size: 10.3px;
             letter-spacing: .5px;
             margin: 0;
-            zoom: 1.75; /* This is a fix for phantomjs failing to get the correct screen dpi */
+            font-weight: 400;
         }
         blockquote p {
             margin: 0;
         }
         h1, h2, h3, h4, h5, h6 {
-            font-weight: bold;
+            font-weight: 700;
         }
         h1 {
             font-size: 16.5px;
@@ -82,6 +84,7 @@
             margin-top: 0;
         }
         .title {
+            font-size: 36px;
             margin: -2px 0 0 0;
         }
         .contributed {
@@ -101,7 +104,7 @@
             right: 10%;
         }
         .author .name {
-            font-weight: bold;
+            font-weight: 700;
             margin-bottom: -5px;
         }
         .hr {
@@ -152,6 +155,7 @@
         .sidebar-inner {
             padding-left: 15px;
             border-left: 1.5px solid black;
+            line-height: 1;
         }
         .rtl .sidebar-inner {
             padding-left: none;

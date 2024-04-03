@@ -10,27 +10,33 @@ git+https://github.com/adrian-the-git/driveclient@master
 #git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
 git+https://github.com/adrian-the-git/archieml-python.git@f4f72139f58d5476324a42541f60a5d7b3e74e3e
 cryptography
-beautifulsoup4==4.8.2
+beautifulsoup4
 CouchDB==1.2
 flask
 flask-restful
 flask-limiter
+
+# See this issue regarding fasttext compiler issues:
+# https://github.com/facebookresearch/fastText/issues/512
+#git+https://github.com/cfculhane/fastText
+wheel
 fasttext
+
 fasttext-langdetect
 fuzzywuzzy>=0.18.0
 jinja2
 markdown
+playwright
 plucky
-psutil
 python-Levenshtein
 python-dateutil
 python-magic
+quart
+quart-rate-limit
 requests
 selenium
 unidecode
-validators
 pyicu
 oauth2client
 google-api-python-client
-pyppeteer
 wget
