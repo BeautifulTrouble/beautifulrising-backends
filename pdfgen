@@ -216,7 +216,7 @@ async def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}
         await page.goto(f"file:///{subdirectory}/{unique_hash}.html")
         await page.emulate_media(media="screen")
         await page.pdf(
-            format="Letter",
+            format="Letter" if paper_size == "letter" else "A4",
             margin={
                 "top": "0.5in",
                 "bottom": "0.5in",
