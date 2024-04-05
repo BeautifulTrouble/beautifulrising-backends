@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-# encoding: utf-8
-
-# Auto-install and activate a virtualenv if possible
-# import autovenv
-
-# autovenv.run()
 
 import asyncio
 import re
@@ -41,11 +35,13 @@ TYPE_ORDER = "story", "tactic", "principle", "theory", "methodology"
 
 PDF_CACHE_LIFESPAN = 1440 * 60
 PDF_API_CACHE_LIFESPAN = 60 * 60
-PDF_LIMIT = "5/minute"
 
 
 app = Quart(__name__)
-limiter = RateLimiter(app, default_limits=[RateLimit(5, timedelta(minutes=1))])
+
+# Limit is 10 requests / minute
+limiter = RateLimiter(app, default_limits=[RateLimit(10, timedelta(minutes=1))])
+
 config = requests.get(f"{API_SERVER}{API_PATH}/config").json()
 
 
@@ -202,19 +198,19 @@ async def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}
     modules, people, text = get_modules_people_and_text(modules, lang)
     log(f"pdfgen: generating pdf of {len(modules)} module(s)")
 
-    with script_directory():
+    with script_directory() as directory:
         with open("pdftemplate.html") as f:
             template = Template(f.read(), extensions=["jinja2.ext.loopcontrols"])
-    html = template.render(markdown=markdown, **__builtins__.__dict__, **vars())
+        html = template.render(markdown=markdown, **__builtins__.__dict__, **vars())
 
-    with script_subdirectory("pdfcache") as subdirectory:
-        with open(f"{unique_hash}.html", "w") as f:
+        # with script_subdirectory("pdfcache") as subdirectory:
+        with open(f"{directory}/pdfcache/{unique_hash}.html", "w") as f:
             f.write(html)
 
         context = await browser.new_context()
         page = await context.new_page()
-        await page.goto(f"file:///{subdirectory}/{unique_hash}.html")
-        await page.emulate_media(media="screen")
+        await page.goto(f"file:///{directory}/pdfcache/{unique_hash}.html")
+        # await page.emulate_media(media="screen")
         await page.pdf(
             format="Letter" if paper_size == "letter" else "A4",
             margin={
@@ -223,11 +219,11 @@ async def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}
                 "left": "0.5in",
                 "right": "0.5in",
             },
-            path=f"{subdirectory}/{unique_hash}.pdf",
+            path=f"{directory}/pdfcache/{unique_hash}.pdf",
         )
         await context.close()
 
-        with open(f"{unique_hash}.pdf", "rb") as f:
+        with open(f"{directory}/pdfcache/{unique_hash}.pdf", "rb") as f:
             return f.read()
 
 
@@ -261,12 +257,15 @@ async def pdf():
     # Create a unique hash of the PDF's specifics
     unique = f"{sorted(set(tools))}{lang}{size}"
     unique_hash = md5(unique.encode()).hexdigest()
+    unique_filename = (
+        f'Beautiful-Trouble_{len(tools) or "all"}-tools_{unique_hash[:5]}.pdf'
+    )
 
     return Response(
         await make_pdf(tools, lang, size, unique_hash),
         mimetype="application/pdf",
         headers={
-            "Content-Disposition": f'{"attachment; " if save else ""}filename="BeautifulTrouble-{unique_hash[:5]}.pdf"'
+            "Content-Disposition": f'{"attachment; " if save else ""}filename="{unique_filename}"'
         },
     )
 
