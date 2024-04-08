@@ -1,27 +1,42 @@
+# These deps may be challenging to build in 2024
+# First upgrade pip
+#   pip install --upgrade pip
+# Then use GCC12 like so:
+#   CC=gcc-12 pip install -r requirements.txt
+# It may be necessary to manually remove the pycrypto package
+#   pip uninstall pycrypto
+
 git+https://github.com/adrian-the-git/driveclient@master
 #git+https://github.com/adrian-the-git/archieml-python.git@v0.3.0
 git+https://github.com/adrian-the-git/archieml-python.git@f4f72139f58d5476324a42541f60a5d7b3e74e3e
-BeautifulSoup4
-couchdb
-fasttext-langdetect
+cryptography
+beautifulsoup4
+CouchDB==1.2
 flask
 flask-restful
 flask-limiter
+
+# See this issue regarding fasttext compiler issues:
+# https://github.com/facebookresearch/fastText/issues/512
+#git+https://github.com/cfculhane/fastText
+wheel
+fasttext
+
+fasttext-langdetect
 fuzzywuzzy>=0.18.0
 jinja2
-langdetect
 markdown
+playwright
 plucky
-psutil
 python-Levenshtein
 python-dateutil
 python-magic
+quart
+quart-rate-limiter
 requests
 selenium
 unidecode
-validators
 pyicu
 oauth2client
-google-api-python-client==1.7.4
-pyppeteer
+google-api-python-client
 wget
