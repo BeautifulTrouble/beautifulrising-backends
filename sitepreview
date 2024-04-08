@@ -46,8 +46,8 @@ async def get_social_image(page):
         'meta[name="twitter:image"]': "content",
         'link[rel="image_src"]': "href",
         'link[as="image"]': "href",
-        'meta[itemprop="thumbnailUrl"]': "content",
         'meta[itemprop="image"]': "content",
+        'meta[itemprop="thumbnailUrl"]': "content",
     }.items():
         try:
             locator = page.locator(f"css={sel}")
