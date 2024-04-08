@@ -198,33 +198,33 @@ async def make_pdf(modules, lang, paper_size, unique_hash, *, last_generation={}
     modules, people, text = get_modules_people_and_text(modules, lang)
     log(f"pdfgen: generating pdf of {len(modules)} module(s)")
 
-    with script_directory() as directory:
+    with script_directory():
         with open("pdftemplate.html") as f:
             template = Template(f.read(), extensions=["jinja2.ext.loopcontrols"])
         html = template.render(markdown=markdown, **__builtins__.__dict__, **vars())
 
-        # with script_subdirectory("pdfcache") as subdirectory:
-        with open(f"{directory}/pdfcache/{unique_hash}.html", "w") as f:
-            f.write(html)
+        with script_subdirectory("pdfcache") as directory:
+            with open(f"{directory}/{unique_hash}.html", "w") as f:
+                f.write(html)
 
-        context = await browser.new_context()
-        page = await context.new_page()
-        await page.goto(f"file:///{directory}/pdfcache/{unique_hash}.html")
-        # await page.emulate_media(media="screen")
-        await page.pdf(
-            format="Letter" if paper_size == "letter" else "A4",
-            margin={
-                "top": "0.5in",
-                "bottom": "0.5in",
-                "left": "0.5in",
-                "right": "0.5in",
-            },
-            path=f"{directory}/pdfcache/{unique_hash}.pdf",
-        )
-        await context.close()
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(f"file:///{directory}/{unique_hash}.html")
+            # await page.emulate_media(media="screen")
+            await page.pdf(
+                format="Letter" if paper_size == "letter" else "A4",
+                margin={
+                    "top": "0.5in",
+                    "bottom": "0.5in",
+                    "left": "0.5in",
+                    "right": "0.5in",
+                },
+                path=f"{directory}/{unique_hash}.pdf",
+            )
+            await context.close()
 
-        with open(f"{directory}/pdfcache/{unique_hash}.pdf", "rb") as f:
-            return f.read()
+            with open(f"{directory}/{unique_hash}.pdf", "rb") as f:
+                return f.read()
 
 
 @app.route("/pdf/download", methods=["GET"])
