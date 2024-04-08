@@ -32,7 +32,7 @@ python-Levenshtein
 python-dateutil
 python-magic
 quart
-quart-rate-limit
+quart-rate-limiter
 requests
 selenium
 unidecode
