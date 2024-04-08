@@ -3,7 +3,6 @@
     <head>
         <meta charset="utf-8"/>
         <style>
-        {% if lang == 'ar' %}
         @font-face {
             font-family: 'Kaff';
             font-weight: 400;
@@ -14,7 +13,16 @@
             font-weight: 700;
             src: url(../pdffonts/KaffBold.ttf);
         }
-        {% endif %}
+        @font-face {
+            font-family: 'Padauk';
+            font-weight: 400;
+            src: url(../pdffonts/Padauk-Regular.ttf);
+        }
+        @font-face {
+            font-family: 'Padauk';
+            font-weight: 700;
+            src: url(../pdffonts/Padauk-Bold.ttf);
+        }
         @font-face {
             font-family: 'Avenir';
             font-weight: 400;
@@ -42,6 +50,8 @@
         body {
             {% if lang == 'ar' %}
             font-family: Kaff, Avenir;
+            {% elif lang == 'my' %}
+            font-family: Padauk, Avenir;
             {% else %}
             font-family: Avenir;
             {% endif %}
