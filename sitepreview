@@ -1,105 +1,140 @@
 #!/usr/bin/env python
 
-import autovenv
-autovenv.run()
-
-
 import asyncio
 import json
 import os
-import shlex
 import subprocess
 import sys
 
 import magic
-import pyppeteer
 import requests
-from bs4 import BeautifulSoup
+from playwright.async_api import (
+    async_playwright,
+    Error as PlaywrightError,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from utils import (
+    script_directory,
     die,
     log,
     warn,
 )
-from config import (
-    PUPPETEER_ARGS,
-)
 
 
-
-CAN_OVERWRITE = [
-    'image/png',
-    'image/jpeg',
-    'image/gif',
-    'text/html',    # Sometimes you get a page instead of an image
+MAX_TASKS = 5
+VALID_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
 ]
 
 
-def download_og_image(url, output_path):
-    '''
-    Attempt to download an OpenGraph og:image
-    If that succeeds, this function will return true
-    '''
+def resize_image(path):
+    subprocess.Popen(["convert", "-quality", "50%", "-resize", "x320", path, path])
+
+
+async def get_social_image(page):
+    """
+    Return a bytes object containing purportedly valid image data or None
+    """
+    # Find at most ONE image url
+    image_url = None
+    for sel, attr in {
+        'meta[property="og:image"]': "content",
+        'meta[name="twitter:image"]': "content",
+        'link[rel="image_src"]': "href",
+        'link[as="image"]': "href",
+        'meta[itemprop="thumbnailUrl"]': "content",
+        'meta[itemprop="image"]': "content",
+    }.items():
+        try:
+            locator = page.locator(f"css={sel}")
+            if image_url := await locator.get_attribute(attr, timeout=100):
+                break
+        except PlaywrightTimeoutError:
+            continue
+
+    # Download and check the validity of the image
+    if image_url:
+        try:
+            r = requests.get(image_url)
+        except requests.RequestException:
+            return
+        if magic.from_buffer(r.content, mime=True) in VALID_TYPES:
+            return r.content
+
+
+async def make_preview(browser, device, url, output_path):
+    # Basic sanity check prevents overwriting non-images
+    log(f"get: {url}")
+    if os.path.isfile(output_path):
+        if magic.from_file(output_path, mime=True) not in VALID_TYPES:
+            warn(f"preview: not overwriting {output_path}")
+            return
 
     try:
-        html = requests.get(url).text
-    except requests.RequestException:
-        return
+        context = await browser.new_context(**device)
+        page = await context.new_page()
+        await page.goto(url)
 
-    for element in BeautifulSoup(html, 'html.parser').select('meta[property="og:image"]'):
-        ogimageurl = element.get('content')
-        if ogimageurl:
-            try:
-                log(f'preview: og:image {output_path}')
-                r = requests.get(ogimageurl)
-            except requests.RequestException:
-                return
-            if r.status_code == 200:
-                with open(output_path, 'wb') as f:
-                    f.write(r.content)
-                    subprocess.run(['convert', '-resize', 'x512', output_path, output_path])
-                    return True
+        # First we try downloading a social image
+        if image_data := await get_social_image(page):
+            with open(output_path, "wb") as f:
+                f.write(image_data)
+                resize_image(output_path)
+                log(f"preview: downloaded preview {output_path}")
+            return
+
+        # Otherwise we'll render an image
+        try:
+            await page.screenshot(path=output_path, type="jpeg", timeout=10000)
+            resize_image(output_path)
+            log(f"preview: generated preview {output_path}")
+        except PlaywrightTimeoutError:
+            warn(f"preview: failed to generate {output_path}")
+
+    except PlaywrightError:
+        warn(f"preview: couldn't load {url}")
+
+    finally:
+        await context.close()
 
 
 async def main(urls_and_outputs):
-    log('pyppeteer: starting up...')
+    log("playwright: starting up...")
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch()
+    device = playwright.devices["Desktop Chrome"]
 
-    args = shlex.split(PUPPETEER_ARGS)
-    browser = await pyppeteer.launch(args=args)
+    async def sem_locked_coroutine(coroutine):
+        async with semaphore:
+            return await coroutine
 
-    for url, output_path in urls_and_outputs.items():
-        if os.path.isfile(output_path):
-            if magic.from_file(output_path, mime=True) not in CAN_OVERWRITE:
-                warn(f'preview: not overwriting {output_path}')
-                continue
+    semaphore = asyncio.Semaphore(MAX_TASKS)
+    coroutines = (
+        make_preview(browser, device, url, output_path)
+        for url, output_path in urls_and_outputs.items()
+    )
+    await asyncio.gather(*(sem_locked_coroutine(c) for c in coroutines))
 
-        if not download_og_image(url, output_path):
-            try:
-                page = await browser.newPage()
-                await page.setViewport({'width': 1366, 'height': 768, 'deviceScaleFactor': 0.5})
-                log(f'preview: rendering {output_path}')
-                await page.goto(url, {'timeout': 15000})
-                await page.screenshot({'path': output_path})
-                await page.close()
-                #subprocess.run(['convert', '-resize', '50%', output_path, output_path])
-            except (pyppeteer.errors.PyppeteerError, pyppeteer.errors.TimeoutError) as e:
-                warn(f'pyppeteer: {e} ({url})')
-            except ConnectionError:
-                await browser.close()
-                browser = await pyppeteer.launch(args=args)
-
-    log('preview: finished')
     await browser.close()
+    await playwright.stop()
+    log("preview: finished")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 2:
-        die(f'preview: Usage: {os.path.basename(sys.argv[0])} JSON_MAPPING_OF_URLS:OUTPUTS')
+        die(
+            f"preview: Usage: {os.path.basename(sys.argv[0])} JSON_MAPPING_OF_URLS:OUTPUTS"
+        )
+
     try:
         urls_and_outputs = json.loads(sys.argv[1])
     except json.decoder.JSONDecodeError:
-        die('preview: unable to load json mapping of urls to output files')
+        die("preview: unable to load json mapping of urls to output files")
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(urls_and_outputs))
-
+    with script_directory():
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main(urls_and_outputs))
