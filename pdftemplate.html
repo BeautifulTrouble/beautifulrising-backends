@@ -183,6 +183,9 @@
         .learn-link {
             font-size: 8px;
         }
+        .no-break {
+            break-before: avoid-page;
+        }
         </style>
     </head>
     <body>
@@ -226,6 +229,14 @@
                     {{ markdown(module['full-write-up']) }}
                     {% elif module.get('short-write-up') %}
                     {{ markdown(module['short-write-up']) }}
+                    {% endif %}
+
+                    {% if module.get('how-to-use') %}
+                    <br>
+                    <h3 class="how">{{ text['how'] }}</h3>
+                    <div class="no-break">
+                    {{ markdown(module['how-to-use']) }}
+                    </div>
                     {% endif %}
 
                     {% if module.get('learn-more') %}

@@ -116,6 +116,7 @@ def get_modules_people_and_text(module_slugs, lang, *, cache={}):
         text["risks"] = plucks(c["texts"], "ui.module.potential-risks")
         text["tags"] = plucks(c["texts"], "ui.module.tags")
         text["types"] = plucks(c["texts"], "ui.types")
+        text["how"] = plucks(c["texts"], "ui.module.how-to-use")
         # Get key-whatever translations in singular & plural
         text["key"] = {
             p: [
