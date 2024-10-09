@@ -28,6 +28,7 @@ from config import (
 
 ABSOLUTE_URL_PREFIX = "https://beautifultrouble.org"
 RELATIVE_URL_REGEX = re.compile("^/tool/.+")
+IMAGE_URL_PREFIX = "https://assets.beautifultrouble.org"
 TAG_URL = urljoin(ABSOLUTE_URL_PREFIX, "/tag/%s")
 TOOL_URL = urljoin(ABSOLUTE_URL_PREFIX, "/tool/%s")
 TYPE_ORDER = "story", "tactic", "principle", "theory", "methodology"
@@ -60,7 +61,7 @@ async def shutdown():
 def markdown(s, p=True):
     """
     Render markdown and filter content which is inappropriate for display in
-    PDFs. Images are stripped and relative links made absolute.
+    PDFs. Images are prefixed and relative links made absolute.
     """
 
     if not s:
@@ -72,9 +73,9 @@ def markdown(s, p=True):
     )
     soup = BeautifulSoup(html, "html.parser")
 
-    # Strip images
+    # Patch images
     for img in soup.findAll("img"):
-        img.extract()
+        img.attrs["src"] = urljoin(IMAGE_URL_PREFIX, img.attrs["src"])
 
     # Make relative links absolute
     for rel_link in soup.findAll("a", href=RELATIVE_URL_REGEX):
