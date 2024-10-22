@@ -161,6 +161,7 @@ def slugify(s, allow=''):
     Reproduce these steps for consistent slugs!
     '''
     s = unidecode.unidecode(s).lower().replace("'", '')
+    # TODO: .strip("-") but first find ALL possible implementations across BT tooling
     return re.sub(rf'[^\w{allow}]+', '-', s)
 
 
